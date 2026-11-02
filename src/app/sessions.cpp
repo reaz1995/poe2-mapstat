@@ -135,8 +135,11 @@ void resetGeneralSession() {
 void restoreSession(SessionFile& sf) {
     bool maps = sf.parts == Tracker::kMaps;
     const wchar_t* title = maps ? L"Restore map session" : L"Restore campaign session";
-    wchar_t file[MAX_PATH] = L"";
+    // Windows may prefer the last folder used by any open dialog of this app (e.g. the game's logs folder) over
+    // lpstrInitialDir, so the current session file is preselected: its folder is then always used.
     std::wstring dir = sessionsDir();
+    wchar_t file[MAX_PATH] = L"";
+    if (GetFileAttributesW(sf.path.c_str()) != INVALID_FILE_ATTRIBUTES) lstrcpynW(file, sf.path.c_str(), MAX_PATH);
     std::wstring filter = std::wstring(sf.prefix) + L" files" + L'\0' + sf.prefix + L"*.tsv" + L'\0' +
                           L"All sessions (*.tsv)" + L'\0' + L"*.tsv" + L'\0' + L'\0';
     OPENFILENAMEW ofn = {};
