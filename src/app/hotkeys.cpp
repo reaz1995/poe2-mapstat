@@ -95,10 +95,10 @@ void endCapture() {
 
 }  // namespace
 
-bool gHotkeysOn = true;
+bool gHotkeysOn = false;
 
 void loadHotkeys() {
-    gHotkeysOn = GetPrivateProfileIntW(L"hotkeys", L"Enabled", 1, iniPath().c_str()) != 0;
+    gHotkeysOn = GetPrivateProfileIntW(L"hotkeys", L"Enabled", 0, iniPath().c_str()) != 0;
     for (auto& k : gKeys) {
         wchar_t b[32];
         GetPrivateProfileStringW(L"hotkeys", k.iniKey, L"", b, 32, iniPath().c_str());

@@ -22,7 +22,7 @@ double gOvScale = 1.0;
 // Everything scales with the window size.
 static const int kOvW = 300, kOvPad = 10, kOvHead = 24, kOvLine = 19, kOvEdge = 7;
 
-int gOvRecords = 3;
+int gOvRecords = 4;
 
 // Settings of this overlay live in [MapTimerOverlay]; older versions used [overlay] (read as fallback).
 static const wchar_t* kOvSec = L"MapTimerOverlay";

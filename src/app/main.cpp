@@ -319,7 +319,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
     gTaskbarCreated = RegisterWindowMessageW(L"TaskbarCreated");
     trayIcon(NIM_ADD);
     if (GetPrivateProfileIntW(L"main", L"OnTop", 0, iniPath().c_str())) setOnTop(true);
-    gOvRecords = std::clamp((int)ovIniInt(L"Records", 3), 0, 10);
+    gOvRecords = std::clamp((int)ovIniInt(L"Records", 4), 0, 10);
     SetWindowTextW(hRecVal, std::to_wstring(gOvRecords).c_str());
     gStartInTray = GetPrivateProfileIntW(L"main", L"StartInTray", 1, iniPath().c_str()) != 0;
     gGameVisible = false;
@@ -327,7 +327,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
     SetWinEventHook(EVENT_SYSTEM_MINIMIZESTART, EVENT_SYSTEM_MINIMIZEEND, nullptr,
                     [](HWINEVENTHOOK, DWORD, HWND, LONG, LONG, DWORD, DWORD) { updateOverlayVisibility(); }, 0, 0,
                     WINEVENT_OUTOFCONTEXT);
-    if (ovIniInt(L"On", 0)) showOverlay(true);
+    if (ovIniInt(L"On", 1)) showOverlay(true);
     if (GetPrivateProfileIntW(kCbSec, L"On", 0, iniPath().c_str())) showCmdBar(true);
     if (firstRun || !gStartInTray || updated) ShowWindow(h, show);
 #ifdef UPDATE_REPO
