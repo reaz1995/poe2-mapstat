@@ -28,10 +28,13 @@ static void setEdit(HWND h, const std::wstring& t) {
     gExpSetting = false;
 }
 
-// Multiplier as a change in percent with 2 decimals, e.g. x0.7816 -> "-21.84%".
+// Multiplier as a change in percent with 2 decimals, e.g. x0.7816 -> "-21.84%". A tiny amount that is left never
+// rounds to -100.00%: it shows as -99.99%, so -100.00% means really nothing.
 std::wstring expPct(double m) {
+    double p = (m - 1.0) * 100.0;
+    if (m > 0 && p < -99.99) p = -99.99;
     wchar_t b[32];
-    swprintf(b, 32, L"%+.2f%%", (m - 1.0) * 100.0);
+    swprintf(b, 32, L"%+.2f%%", p);
     return b;
 }
 
