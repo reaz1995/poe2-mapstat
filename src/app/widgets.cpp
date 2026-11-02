@@ -243,7 +243,7 @@ COLORREF staticColor(HWND c) {
         c == hLblUpd || c == hLblKeys)
         return C::Pink;
     if (c == hDetLbl || c == hOptLbl || c == hUpdInfo) return C::Comment;
-    if (c == hRecVal) return C::Purple;
+    if (c == hRecVal || c == hAlphaVal) return C::Purple;
     if (c == hSumHdr || c == hSummary || c == hCmpSum) return C::Cyan;
     return C::Fg;
 }

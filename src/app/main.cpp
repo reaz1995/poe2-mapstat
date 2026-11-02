@@ -160,6 +160,10 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     setOverlayRecords(gOvRecords + (LOWORD(wp) == ID_REC_PLUS ? 1 : -1));
                     SetWindowTextW(hRecVal, std::to_wstring(gOvRecords).c_str());
                     break;
+                case ID_ALPHA_MINUS:
+                case ID_ALPHA_PLUS:
+                    setOverlayTransparency(gOvTransparency + (LOWORD(wp) == ID_ALPHA_PLUS ? 10 : -10));
+                    break;
                 case ID_CLOSE_CHK:
                     gStartInTray = !gStartInTray;
                     WritePrivateProfileStringW(L"main", L"StartInTray", gStartInTray ? L"1" : L"0", iniPath().c_str());
@@ -321,6 +325,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
     if (GetPrivateProfileIntW(L"main", L"OnTop", 0, iniPath().c_str())) setOnTop(true);
     gOvRecords = std::clamp((int)ovIniInt(L"Records", 4), 0, 10);
     SetWindowTextW(hRecVal, std::to_wstring(gOvRecords).c_str());
+    setOverlayTransparency(ovIniInt(L"Transparency", 10));
     gStartInTray = GetPrivateProfileIntW(L"main", L"StartInTray", 1, iniPath().c_str()) != 0;
     gGameVisible = false;
     // react at once when the game is minimized / restored (the 0.5 s poll covers start / close)

@@ -1,0 +1,24 @@
+# Poe2 | MapStat theme - Dark Cyan
+# Pitch black surfaces (like a terminal), so a see-through overlay stays black over the game; cyan text and accents.
+name: Dark Cyan
+mode: dark
+
+colors:
+  background: "#000000"
+  card:       "#000000"
+  darkest:    "#000000"
+  line:       "#1f4a52"
+  stripe:     "#0a0d0e"
+  foreground: "#b4eef5"
+  comment:    "#5a8790"
+  purple:     "#22d3e6"
+  cyan:       "#7eeaf2"
+  green:      "#4be3a5"
+  orange:     "#f2a65a"
+  pink:       "#5cc8ff"
+  red:        "#ff5f6d"
+  yellow:     "#e8e27a"
+
+fonts:
+  ui:   "Segoe UI"
+  mono: "Consolas"
