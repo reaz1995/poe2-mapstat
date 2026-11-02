@@ -53,17 +53,17 @@ double penaltyMultiplier(int charLevel, int areaLevel) {
     return std::pow(l / (l + std::pow((double)ed, 2.5)), 1.5);
 }
 
-int bestArea(int charLevel) {
+int bestArea(int charLevel, double bonus) {
     int best = 1;
     for (int a = 2; a <= 99; ++a)
-        if (expectedExp(charLevel, a) > expectedExp(charLevel, best) * (1 + 1e-9)) best = a;
+        if (expectedExp(charLevel, a, bonus) > expectedExp(charLevel, best, bonus) * (1 + 1e-9)) best = a;
     return best;
 }
 
-std::string bestAreaText(int charLevel) {
-    int lo = bestArea(charLevel), hi = lo;
-    double top = expectedExp(charLevel, lo);
-    while (hi < 99 && expectedExp(charLevel, hi + 1) >= top * (1 - 1e-9)) ++hi;
+std::string bestAreaText(int charLevel, double bonus) {
+    int lo = bestArea(charLevel, bonus), hi = lo;
+    double top = expectedExp(charLevel, lo, bonus);
+    while (hi < 99 && expectedExp(charLevel, hi + 1, bonus) >= top * (1 - 1e-9)) ++hi;
     return hi > lo ? std::to_string(lo) + "-" + std::to_string(hi) : std::to_string(lo);
 }
 

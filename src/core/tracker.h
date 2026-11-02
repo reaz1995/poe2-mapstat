@@ -160,6 +160,14 @@ public:
     void replaceCampaign(const Tracker& src);  // campaign zones from `src`; the current zone keeps running
     void feed(const std::string& rawLine);
 
+    // In a sub-area of the open map (Abyssal Depths, Lightless Void, ...): `location` is that sub-area.
+    bool inSubArea() const { return hasCurrent && curSub >= 0 && isSubArea(location); }
+    // Time spent in the current sub-area (all visits of that instance), live. Part of the map time as well.
+    uint64_t subAreaAt(uint32_t nowTick) const {
+        if (!inSubArea()) return 0;
+        return cur.subs[curSub].ms + (cur.inSegment ? (uint32_t)(nowTick - cur.segStartTick) : 0);
+    }
+
     static bool isSafeArea(const std::string& area, uint32_t seed);
     static bool isSubArea(const std::string& area);
     static bool isHideout(const std::string& area);

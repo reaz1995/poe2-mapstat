@@ -108,6 +108,9 @@ enum {
     ID_EXP_NAME,
     ID_EXP_LEVEL,
     ID_EXP_AREA,
+    ID_EXP_TAB_EFF,
+    ID_EXP_MAP_EFF,
+    ID_EXP_GAIN,
     ID_EXP_LBLS,
     ID_EXP_INFO,
     ID_EXP_ROWLBL,
@@ -215,9 +218,11 @@ extern HWND hCmpTimerLoad;  // Campaign: zone time including its loading screens
 extern HWND hCmpPause, hCmpStop;
 extern HWND hLblKeys, hKeyLbl[3], hKeyBtn[3], hKeysChk;
 extern bool gHotkeysOn;  // Options: hotkeys enabled
-extern HWND hTabExp, hExpName, hExpLevel, hExpArea, hExpInfo, hExpRowLbl, hExpOvChk, hExpHint;
+extern HWND hTabExp, hExpName, hExpLevel, hExpArea, hExpTabEff, hExpMapEff, hExpGain, hExpInfo, hExpRowLbl, hExpOvChk,
+    hExpHint;
 extern std::wstring gExpName;
 extern int gExpLevel;
+extern int gTabEff, gMapEff, gExpGain;  // Experience tab: tablet / map effectiveness and tablet exp gain, in %
 extern bool gExpOnOverlay;
 extern HANDLE gMutex;
 extern bool gGameVisible;  // PoE2 window exists and is not minimized
@@ -356,6 +361,8 @@ void toggleHotkeys();
 // ---------------------------------------------------------------- page_experience.cpp
 int expAreaLevel();
 int expArea();
+double expEffMult();  // effectiveness (tablets + map) as an experience multiplier, applied to the monster base exp
+double expGainMult();  // increased experience gain as a multiplier, applied after the level penalty
 bool expNoMonsters();
 std::wstring expPct(double m);
 void loadExperience();

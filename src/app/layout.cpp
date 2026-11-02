@@ -1,7 +1,8 @@
 // Creates all controls and lays out the pages.
 #include "app.h"
 
-static HWND hExpCap[3];  // captions above the Experience inputs
+static HWND hExpCap[6];  // captions above the Experience inputs
+static HWND hExpModsLbl;  // "TABLETS / MAP MODS" section title
 
 // Maps tab has two sub-pages (Session, Summary); the tab opens the one that was shown last.
 static int gMapsPage = PG_GENERAL;
@@ -101,8 +102,18 @@ void layout(int w, int h) {
     y += 30;
     {
         int x = L;
-        struct { HWND e; int w; } f[] = {{hExpName, 260}, {hExpLevel, 80}, {hExpArea, 80}};
-        for (int i = 0; i < 3; ++i) {
+        struct {
+            HWND e;
+            int w;
+        } f[] = {{hExpName, 260},   {hExpLevel, 80},   {hExpArea, 80},
+                 {hExpTabEff, 200}, {hExpMapEff, 200}, {hExpGain, 200}};
+        for (int i = 0; i < 6; ++i) {
+            if (i == 3) {  // second row: tablets and map mods
+                x = L;
+                y += 24 + rh + 16;
+                place(hExpModsLbl, L, y, CW, 18);
+                y += 24;
+            }
             auto& e = f[i];
             place(hExpCap[i], x, y, e.w + 10, 18);
             card(PG_EXPERIENCE, x, y + 24, e.w, rh);
@@ -111,10 +122,10 @@ void layout(int w, int h) {
         }
         y += 24;
         y += rh + 18;
-        card(PG_EXPERIENCE, L, y, CW, 6 * 20 + 2 * pad);
-        place(hExpRowLbl, L + pad + 4, y + pad, 170, 6 * 20);
-        place(hExpInfo, L + pad + 180, y + pad, CW - 2 * pad - 184, 6 * 20);
-        y += 6 * 20 + 2 * pad + 16;
+        card(PG_EXPERIENCE, L, y, CW, 8 * 20 + 2 * pad);
+        place(hExpRowLbl, L + pad + 4, y + pad, 170, 8 * 20);
+        place(hExpInfo, L + pad + 180, y + pad, CW - 2 * pad - 184, 8 * 20);
+        y += 8 * 20 + 2 * pad + 16;
         place(hExpOvChk, L, y, 420, 26);
     }
 
@@ -239,15 +250,28 @@ void createControls() {
     hCmdChk = btn(L"CommandBarOverlay", ID_CMDBAR, PG_OPTIONS, Btn::Check);
     // Experience
     {
-        const wchar_t* t[3] = {L"CHARACTER NAME", L"LEVEL", L"AREA LEVEL"};
-        for (int i = 0; i < 3; ++i) hExpCap[i] = label(t[i], ID_EXP_LBLS, fSection, PG_EXPERIENCE);
+        const wchar_t* t[6] = {L"CHARACTER NAME",      L"LEVEL",
+                               L"AREA LEVEL",          L"TABLET EFFECTIVENESS %",
+                               L"MAP EFFECTIVENESS %", L"TABLET EXP GAIN %"};
+        for (int i = 0; i < 6; ++i) hExpCap[i] = label(t[i], ID_EXP_LBLS, fSection, PG_EXPERIENCE);
+        hExpModsLbl = label(L"TABLETS / MAP MODS", ID_EXP_LBLS, fSection, PG_EXPERIENCE);
     }
     hExpName = mk(L"EDIT", gExpName.c_str(), ES_AUTOHSCROLL | WS_TABSTOP, ID_EXP_NAME, fNormal, PG_EXPERIENCE);
     hExpLevel = mk(L"EDIT", gExpLevel ? std::to_wstring(gExpLevel).c_str() : L"", ES_NUMBER | WS_TABSTOP, ID_EXP_LEVEL, fNormal, PG_EXPERIENCE);
     hExpArea = mk(L"EDIT", L"", ES_NUMBER | WS_TABSTOP, ID_EXP_AREA, fNormal, PG_EXPERIENCE);
+    auto pctEdit = [](int v, int id) {
+        HWND e = mk(L"EDIT", v ? std::to_wstring(v).c_str() : L"", ES_NUMBER | WS_TABSTOP, id, fNormal, PG_EXPERIENCE);
+        SendMessageW(e, EM_LIMITTEXT, 4, 0);
+        return e;
+    };
+    hExpTabEff = pctEdit(gTabEff, ID_EXP_TAB_EFF);
+    hExpMapEff = pctEdit(gMapEff, ID_EXP_MAP_EFF);
+    hExpGain = pctEdit(gExpGain, ID_EXP_GAIN);
     for (HWND e : {hExpLevel, hExpArea}) SendMessageW(e, EM_LIMITTEXT, 3, 0);  // levels 1-100
-    hExpRowLbl = label(L"Exp to next level\r\nSafe range\r\nMonster base exp\r\nPenalty multiplier\r\nExpected exp\r\nBest area",
-                       ID_EXP_ROWLBL, fNormal, PG_EXPERIENCE, true);
+    hExpRowLbl = label(
+        L"Exp to next level\r\nSafe range\r\nMonster base exp\r\nEffectiveness\r\nPenalty multiplier\r\n"
+        L"Experience gain\r\nExpected exp\r\nBest area",
+        ID_EXP_ROWLBL, fNormal, PG_EXPERIENCE, true);
     hExpInfo = label(L"", ID_EXP_INFO, fNormal, PG_EXPERIENCE, true);
     hExpOvChk = btn(L"Show safe area level and exp bonus on MapTimerOverlay", ID_EXP_OVCHK, PG_EXPERIENCE, Btn::Check);
     hExpHint = label(L"Enter your character name and the level updates by itself on every level up.", ID_EXP_HINT,
