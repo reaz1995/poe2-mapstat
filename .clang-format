@@ -1,0 +1,31 @@
+# Code style of Poe2 | MapStat. Format a file with: clang-format -i src/app/page_campaign.cpp
+# (VS Code / CLion / Visual Studio pick this file up for "Format Document" automatically.)
+BasedOnStyle: Google
+Language: Cpp
+Standard: c++20
+IndentWidth: 4
+ContinuationIndentWidth: 4
+ColumnLimit: 120
+AccessModifierOffset: -4
+IndentCaseLabels: true
+NamespaceIndentation: None
+PointerAlignment: Left
+DerivePointerAlignment: false
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortLoopsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortLambdasOnASingleLine: All
+SpacesBeforeTrailingComments: 2
+AlignTrailingComments: false
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignAfterOpenBracket: Align
+BinPackArguments: true
+BinPackParameters: true
+IncludeBlocks: Preserve
+SortIncludes: Never
+ReflowComments: false
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
