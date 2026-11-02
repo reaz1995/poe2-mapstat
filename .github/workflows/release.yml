@@ -1,0 +1,74 @@
+# Publishes a GitHub release when the version in the VERSION file changes.
+# Push to main with a new version (e.g. 1.0.0 -> 1.1.0): the exe is built and released as tag v1.1.0.
+# Push with the same version: nothing happens. Installed copies pick the new release up with their self-update.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  LLVM_MINGW: llvm-mingw-20250402-ucrt-ubuntu-20.04-x86_64
+  LLVM_MINGW_URL: https://github.com/mstorsjo/llvm-mingw/releases/download/20250402/llvm-mingw-20250402-ucrt-ubuntu-20.04-x86_64.tar.xz
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: ver
+        run: |
+          v="$(head -n1 VERSION | tr -d '[:space:]')"
+          if ! [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "VERSION must look like 1.2.3, got '$v'" >&2
+            exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "tag=v$v" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if this version is already released
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then
+            echo "Release ${{ steps.ver.outputs.tag }} already exists, nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install llvm-mingw
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          curl -sSL "$LLVM_MINGW_URL" -o /tmp/llvm-mingw.tar.xz
+          tar -xf /tmp/llvm-mingw.tar.xz -C /opt
+          echo "LLVM_MINGW_DIR=/opt/$LLVM_MINGW" >> "$GITHUB_ENV"
+
+      - name: Build
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+                -DLLVM_MINGW_DIR="$LLVM_MINGW_DIR" -DGITHUB_REPO="${{ github.repository }}" -DDEPLOY_DIR=
+          cmake --build build -j
+          ls -l build/Poe2MapStat.exe
+
+      - name: Publish release
+        if: steps.check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.ver.outputs.tag }}" build/Poe2MapStat.exe \
+            --title "Poe2 | MapStat ${{ steps.ver.outputs.tag }}" \
+            --target "${{ github.sha }}" \
+            --generate-notes

@@ -1,0 +1,23 @@
+# Poe2 | MapStat theme - Nord
+name: Nord
+mode: dark
+
+colors:
+  background: "#2e3440"
+  card:       "#3b4252"
+  darkest:    "#242933"
+  line:       "#4c566a"
+  stripe:     "#373e4c"
+  foreground: "#eceff4"
+  comment:    "#7b88a1"
+  purple:     "#88c0d0"
+  cyan:       "#8fbcbb"
+  green:      "#a3be8c"
+  orange:     "#d08770"
+  pink:       "#b48ead"
+  red:        "#bf616a"
+  yellow:     "#ebcb8b"
+
+fonts:
+  ui:   "Segoe UI"
+  mono: "Consolas"
