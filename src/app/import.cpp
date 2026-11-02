@@ -107,6 +107,7 @@ static void importWorker(std::wstring path, std::string cutoff, std::string endC
     t.suspend(t.lastTick);  // whatever was open is paused; re-entering the same map continues its row
     r->data = t.serialize();
     r->names = t.areaNames;
+    r->levels = t.areaLevels;
     PostMessageW(hMain, WM_IMPORTED, 0, (LPARAM)r);
 }
 
@@ -157,8 +158,12 @@ void importDone(ImportResult* r) {
     setSessionFile(gMapFile, newSessionPath(gMapFile, W(d), L" (" + W(r->source) + L")"));
     Tracker imp;
     imp.deserialize(r->data);
-    g.replaceMaps(imp);  // General list; Summary adds the imported maps; Campaign and the live map/zone stay
+    g.replaceMaps(imp);  // Maps list; Summary adds the imported maps; Campaign and the live map/zone stay
     for (auto& [k, v] : r->names) g.areaNames[k] = v;
+    for (auto& [k, v] : r->levels) {
+        g.noteAreaLevel(k, v.first);
+        g.noteAreaLevel(k, v.second);
+    }
     g.saveAreaNames(areasPath());
     gHistoryLoaded = true;
     saveData();
@@ -315,10 +320,12 @@ static void customRangeDialog() {
         MessageBoxW(hMain, (std::wstring(L"File not found:\n") + file).c_str(), L"Load past Map session events", MB_ICONERROR);
         return;
     }
-    if (!ask(L"Load past Map session events", (L"Replace the maps on the General tab with " + W(from.substr(0, 10)) + L" - " +
-                                   W(to.substr(0, 10)) + L"?\nSummary keeps its maps and adds these. Campaign is not changed.\n\n"
-                                   L"The current list stays in its own MapSession file - General > Restore map session... "
-                                   L"brings it back.").c_str()))
+    if (!ask(L"Load past Map session events",
+             (L"Replace the maps on the Maps tab with " + W(from.substr(0, 10)) + L" - " + W(to.substr(0, 10)) +
+              L"?\nSummary keeps its maps and adds these. Campaign is not changed.\n\n"
+              L"The current list stays in its own MapSession file - Maps > Restore map session... "
+              L"brings it back.")
+                 .c_str()))
         return;
     startImport(file, from, to);
 }
@@ -349,8 +356,8 @@ void pastEventsMenu() {
         return;
     }
     if (!ask(L"Load past Map session events",
-             L"Replace the maps on the General tab with the past events?\nSummary keeps its maps and adds these. "
-             L"Campaign is not changed.\n\nThe current list stays in its own MapSession file - General > Restore map "
+             L"Replace the maps on the Maps tab with the past events?\nSummary keeps its maps and adds these. "
+             L"Campaign is not changed.\n\nThe current list stays in its own MapSession file - Maps > Restore map "
              L"session... brings it back."))
         return;
     if (cmd == 50) {

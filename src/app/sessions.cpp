@@ -109,7 +109,8 @@ static void startNewSessionFile(SessionFile& sf) {
 void resetSummaryData() {
     if (!ask(L"Reset Summary",
              L"Reset the Summary?\n\nSummary starts empty and counts maps from now on. The map that is open now is not "
-             L"counted. The General tab and Campaign are not affected. Export to CSV first if you want to keep the data."))
+             L"counted. The Maps tab and Campaign are not affected. Export to CSV first if you want to keep the "
+             L"data."))
         return;
     startNewSessionFile(gSumFile);
     g.resetSummary();
@@ -118,8 +119,9 @@ void resetSummaryData() {
 }
 
 void resetGeneralSession() {
-    if (!ask(L"Reset Session", L"Reset the session on the General tab?\nThe current map is closed and the list and dialogue are cleared.\n"
-                               L"Summary is not affected. Export first if you want to keep the list."))
+    if (!ask(L"Reset Session",
+             L"Reset the session on the Maps tab?\nThe current map is closed and the list is cleared.\n"
+             L"Summary is not affected. Export first if you want to keep the list."))
         return;
     startNewSessionFile(gMapFile);
     g.resetGeneral();

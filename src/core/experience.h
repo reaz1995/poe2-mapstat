@@ -1,6 +1,7 @@
 // Character experience: level table, monster experience per level, safe range and level penalty.
 #pragma once
 #include <cstdint>
+#include <string>
 
 namespace xp {
 
@@ -28,6 +29,9 @@ inline double expectedExp(int charLevel, int areaLevel) {
 
 // Area level (1-99) with the most experience per monster for this character; the lowest one on a tie.
 int bestArea(int charLevel);
+
+// The best area as text: "55", or a range like "89-99" when several levels in a row give the same experience.
+std::string bestAreaText(int charLevel);
 
 // The same compared to a monster of the character's own level (1.0 = the same, 1.2 = 20% more).
 inline double expectedMultiplier(int charLevel, int areaLevel) {

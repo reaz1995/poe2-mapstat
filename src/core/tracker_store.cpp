@@ -29,7 +29,7 @@ static std::vector<std::string> splitTab(const std::string& line) {
     return out;
 }
 
-// "RUN" (General list) and "ARCH" (kept for Summary only) share one record layout.
+// "RUN" (Maps list) and "ARCH" (kept for Summary only) share one record layout.
 static std::string runLine(const char* tag, const Run& r) {
     std::string subs;
     for (auto& x : r.subs)

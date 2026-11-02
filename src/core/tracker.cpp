@@ -4,8 +4,6 @@
 #include "tracker.h"
 #include "string_util.h"
 
-static const char* kDialogueHash = "3ef23348";  // hash column of NPC dialogue lines
-
 const char* stateName(RunState s) {
     switch (s) {
         case RunState::Loading: return "Loading";
@@ -59,7 +57,6 @@ void Tracker::resetSession() {
     curZone = -1;
     hasCurrent = false;
     cur = Run{};
-    npcLines.clear();
     location.clear();
     locationLoaded = false;
     locationName.clear();
@@ -116,6 +113,7 @@ void Tracker::onGenerate(const std::string& area, int level, uint32_t seed, cons
 
     // Campaign zone: own timer per area+seed, pauses any map run.
     if (isCampaign(area)) {
+        noteAreaLevel(area, level);
         inSafe = true;
         if (hasCurrent) cur.state = RunState::Paused;
         if (cmpClock == Clock::Stopped) {  // campaign run finished: nothing is tracked until a new one starts
@@ -175,7 +173,7 @@ void Tracker::onGenerate(const std::string& area, int level, uint32_t seed, cons
         return;
     }
     // Same instance as the last finished map (game crash / relog / app restart, then back through the portal):
-    // continue that row instead of starting a new one. Not across a General/Summary reset.
+    // continue that row instead of starting a new one. Not across a Maps/Summary reset.
     // Area + seed identify one instance, so any earlier row of it is continued (never two rows per instance).
     int match = -1;
     for (size_t i = history.size(); i-- > std::max(generalStart, summaryStart);)
@@ -192,7 +190,6 @@ void Tracker::onGenerate(const std::string& area, int level, uint32_t seed, cons
             cur.inSegment = false;
             cur.inHideout = false;
             pending = Pending::Run;
-            npcLines.clear();
             if (onHistoryChanged) onHistoryChanged();
             return;
         }
@@ -269,12 +266,6 @@ void Tracker::onLoaded(const std::string& name, double sec, const LogLine& l) {
     pending = Pending::None;
 }
 
-void Tracker::onDialogue(const std::string& speaker, const std::string& text, const LogLine& l) {
-    if (!hasCurrent || !cur.inSegment) return;
-    npcLines.push_back(l.time + "  " + speaker + ": " + text);
-    if (npcLines.size() > 200) npcLines.erase(npcLines.begin());
-}
-
 void Tracker::onDisconnect(const LogLine& l) {
     goOffline(l.tick);
     inHideoutNow = false;
@@ -337,13 +328,5 @@ void Tracker::feed(const std::string& raw) {
         (startsWith(m, "Async connecting to ") && m.find(".login.") != std::string::npos)) {
         onDisconnect(l);
         return;
-    }
-    if (l.hash == kDialogueHash && !m.empty()) {
-        // Chat lines start with #,$,@,%,& or ':' (system). NPC lines are "Speaker: text".
-        char c = m[0];
-        if (c == '#' || c == '$' || c == '@' || c == '%' || c == '&' || c == ':' || c == '[') return;
-        size_t sep = m.find(": ");
-        if (sep == std::string::npos || sep > 80) return;
-        onDialogue(m.substr(0, sep), trim(m.substr(sep + 2)), l);
     }
 }

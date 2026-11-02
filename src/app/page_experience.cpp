@@ -123,7 +123,8 @@ void refreshExperience() {
         }
         int best = xp::bestArea(cl);
         wchar_t b[96];
-        swprintf(b, 96, L"area %d:   %ls per monster   (%ls vs a monster of your level)", best, perMonster(cl, best).c_str(),
+        swprintf(b, 96, L"area %ls:   %ls per monster   (%ls vs a monster of your level)",
+                 W(xp::bestAreaText(cl)).c_str(), perMonster(cl, best).c_str(),
                  pct(xp::expectedMultiplier(cl, best)).c_str());
         v += L"\r\n" + std::wstring(b);
     }

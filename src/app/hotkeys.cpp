@@ -57,7 +57,7 @@ LRESULT CALLBACK keyProc(int code, WPARAM wp, LPARAM lp) {
             if (down && !repeat) PostMessageW(hMain, WM_KEY_CAPTURED, vk, currentMods());
             return 1;
         }
-        if (down && !repeat && gCapture < 0) {
+        if (down && !repeat && gCapture < 0 && gHotkeysOn) {
             int mods = currentMods();
             for (int i = 0; i < HK_COUNT; ++i)
                 if (gKeys[i].vk && gKeys[i].vk == vk && gKeys[i].mods == mods && targetInFront()) {
@@ -95,7 +95,10 @@ void endCapture() {
 
 }  // namespace
 
+bool gHotkeysOn = true;
+
 void loadHotkeys() {
+    gHotkeysOn = GetPrivateProfileIntW(L"hotkeys", L"Enabled", 1, iniPath().c_str()) != 0;
     for (auto& k : gKeys) {
         wchar_t b[32];
         GetPrivateProfileStringW(L"hotkeys", k.iniKey, L"", b, 32, iniPath().c_str());
@@ -125,6 +128,13 @@ std::wstring hotkeyName(int i) {
     if (k.mods & 2) s += L"Shift+";
     if (k.mods & 4) s += L"Alt+";
     return s + keyText(k.vk);
+}
+
+void toggleHotkeys() {
+    gHotkeysOn = !gHotkeysOn;
+    WritePrivateProfileStringW(L"hotkeys", L"Enabled", gHotkeysOn ? L"1" : L"0", iniPath().c_str());
+    InvalidateRect(hKeysChk, nullptr, FALSE);
+    refreshCampaign(true);
 }
 
 void beginKeyCapture(int i) {

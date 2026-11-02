@@ -2,7 +2,10 @@
 #include "app.h"
 #include "experience.h"
 
-struct OvLine { std::wstring lvl, name, time; };
+struct OvLine {
+    std::wstring lvl, name, time;
+    std::wstring range = L"";  // "54-64" for zones that follow the character level, shown small after the level
+};
 
 static int ovHeight(double sc, int n);
 static void overlayData(OvLine& head, std::vector<OvLine>& last, COLORREF& timeCol);
@@ -38,9 +41,9 @@ static const int kOvFoot = 9 + 19;  // separator + one line
 
 static bool gOvFoot = false;
 
-// Two experience lines under the header (Experience tab): "Safe" = the last area level without penalty on the side
-// of the current area and "Diff" = how far the current area is from it; "Best" = the area level with the most
-// experience per monster. Both with the experience compared to a monster of the character's own level.
+// Two experience lines under the header (Experience tab): the character level with "Area diff" (how far the current
+// area is past the safe range) and the best area level to level up in. Both with the experience compared to a
+// monster of the character's own level.
 static const int kOvExp = 18;
 static bool gOvExp = false;
 
@@ -77,7 +80,8 @@ static void overlayDataNow(OvLine& head, std::vector<OvLine>& last, COLORREF& ti
             timeCol = C::Red;
         } else {
             const Zone& z = g.zones[g.curZone];
-            head = {std::to_wstring(z.level), areaName(z.name, z.areaId), W(fmtDuration(z.activeAt(now)))};
+            head = {std::to_wstring(z.level), areaName(z.name, z.areaId), W(fmtDuration(z.activeAt(now))),
+                    W(g.levelRange(z.areaId))};
             timeCol = g.cmpClock == Tracker::Clock::Paused ? C::Yellow : z.inSegment ? C::Purple : C::Cyan;
         }
         std::vector<int> idx;
@@ -114,7 +118,7 @@ void ovFonts(double sc) {
     if (fOvHead) DeleteObject(fOvHead);
     if (fOvSmall) DeleteObject(fOvSmall);
     if (fOvTiny) DeleteObject(fOvTiny);
-    fOvTiny = font((int)(12 * sc + 0.5), FW_SEMIBOLD, gFontUi.c_str());
+    fOvTiny = font((int)(11 * sc + 0.5), FW_NORMAL, gFontUi.c_str());  // level range after the header level
     fOvHead = font((int)(18 * sc + 0.5), FW_BOLD, gFontUi.c_str());
     fOvSmall = font((int)(14 * sc + 0.5), FW_NORMAL, gFontUi.c_str());
 }
@@ -147,16 +151,29 @@ static void paintOverlay(HDC dc, RECT rc) {
         RECT lv = {P, y, P + ls.cx + 2, y + h};
         SetTextColor(dc, lvlCol);
         DrawTextW(dc, l.lvl.c_str(), -1, &lv, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-        RECT n = {P + (l.lvl.empty() ? 0 : ls.cx + (int)(8 * S)), y, rc.right - P - ts.cx - (int)(10 * S), y + h};
+        int nameX = P + (l.lvl.empty() ? 0 : ls.cx + (int)(8 * S));
+        if (!l.range.empty()) {  // "(54-64)" in the tiny font right after the level
+            std::wstring r = L"(" + l.range + L")";
+            SelectObject(dc, fOvTiny);
+            SIZE rs;
+            GetTextExtentPoint32W(dc, r.c_str(), (int)r.size(), &rs);
+            RECT rr = {nameX - (int)(5 * S), y, nameX - (int)(5 * S) + rs.cx, y + h};
+            SetTextColor(dc, C::Comment);
+            DrawTextW(dc, r.c_str(), -1, &rr, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            nameX = rr.right + (int)(8 * S);
+            SelectObject(dc, f);
+        }
+        RECT n = {nameX, y, rc.right - P - ts.cx - (int)(10 * S), y + h};
         SetTextColor(dc, nameCol);
         DrawTextW(dc, l.name.c_str(), -1, &n, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
     };
     line(head, P, HH, fOvHead, C::Pink, C::Fg, timeCol);
     const int XL = (int)(kOvExp * S), XH = gOvExp ? 2 * XL : 0;
     if (gOvExp) {
-        // Safe: the last area level without penalty on the side of the current area (below or above the
-        // character). Diff: how far the current area is from it, negative = levels outside the safe range (red).
-        // Best: the area level with the most experience per monster for this character.
+        // Line 1: "Your lvl: 63   Area diff: -9" and the exp bonus of the current area. Area diff = how far the
+        // current area is past the safe range (3 + level / 16 levels around the character): negative and red =
+        // levels outside it, positive = levels left before the penalty starts.
+        // Line 2: "Best area: 55", the area level with the most experience per monster, and its exp bonus.
         int area = expArea(), range = xp::safeRange(gExpLevel);
         bool below = area > 0 && area < gExpLevel;
         int bound = below ? std::max(1, gExpLevel - range) : gExpLevel + range;
@@ -169,23 +186,26 @@ static void paintOverlay(HDC dc, RECT rc) {
         GetTextExtentPoint32W(dc, vArea.c_str(), (int)vArea.size(), &w1);
         GetTextExtentPoint32W(dc, vBest.c_str(), (int)vBest.size(), &w2);
         const int valueW = std::max(w1.cx, w2.cx);
-        auto expLine = [&](int y, const std::wstring& label, const std::wstring& note, COLORREF noteCol, double m,
-                           const std::wstring& val) {
+        // Draws "caption value" pairs from the left (caption grey), then "Exp bonus: x%" aligned right.
+        struct Part {
+            std::wstring caption, value;
+            COLORREF col;
+        };
+        auto expLine = [&](int y, std::initializer_list<Part> parts, double m, const std::wstring& val) {
             RECT r = {P, y, rc.right - P, y + XL};
-            SetTextColor(dc, C::Green);
-            DrawTextW(dc, label.c_str(), -1, &r, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-            if (!note.empty()) {
-                SIZE lw;
-                GetTextExtentPoint32W(dc, label.c_str(), (int)label.size(), &lw);
-                RECT rd = r;
-                rd.left += lw.cx + (int)(10 * S);
+            int x = P;
+            for (const Part& p : parts) {
+                std::wstring cap = p.caption + L" ";
+                SIZE cw, vw;
+                GetTextExtentPoint32W(dc, cap.c_str(), (int)cap.size(), &cw);
+                GetTextExtentPoint32W(dc, p.value.c_str(), (int)p.value.size(), &vw);
+                RECT rp = {x, y, rc.right - P, y + XL};
                 SetTextColor(dc, C::Comment);
-                DrawTextW(dc, L"Diff:", -1, &rd, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-                SIZE dw;
-                GetTextExtentPoint32W(dc, L"Diff: ", 6, &dw);
-                rd.left += dw.cx;
-                SetTextColor(dc, noteCol);
-                DrawTextW(dc, note.c_str(), -1, &rd, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                DrawTextW(dc, cap.c_str(), -1, &rp, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                rp.left += cw.cx;
+                SetTextColor(dc, p.col);
+                DrawTextW(dc, p.value.c_str(), -1, &rp, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                x = rp.left + vw.cx + (int)(10 * S);
             }
             SetTextColor(dc, m > 1.0005 ? C::Green : m < 0.9995 ? C::Red : C::Fg);
             DrawTextW(dc, val.c_str(), -1, &r, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
@@ -194,10 +214,12 @@ static void paintOverlay(HDC dc, RECT rc) {
             SetTextColor(dc, C::Comment);
             DrawTextW(dc, L"Exp bonus:", -1, &rl, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
         };
-        expLine(P + HH, L"Safe " + std::to_wstring(bound),
-                area > 0 ? (margin > 0 ? L"+" : L"") + std::to_wstring(margin) : L"-",
-                area > 0 && margin < 0 ? C::Red : C::Fg, mArea, vArea);
-        expLine(P + HH + XL, L"Best " + std::to_wstring(best), L"", C::Comment, mBest, vBest);
+        std::wstring diff = area > 0 ? (margin > 0 ? L"+" : L"") + std::to_wstring(margin) : L"-";
+        expLine(P + HH,
+                {{L"Your lvl:", std::to_wstring(gExpLevel), C::Green},
+                 {L"Area diff:", diff, area > 0 && margin < 0 ? C::Red : C::Fg}},
+                mArea, vArea);
+        expLine(P + HH + XL, {{L"Best area:", W(xp::bestAreaText(gExpLevel)), C::Green}}, mBest, vBest);
     }
     HBRUSH b;
     if (gOvRecords > 0) {
@@ -292,6 +314,8 @@ void setOverlayRecords(int n) {
 }
 
 // Campaign footer: shown whenever the player is in a campaign zone. Experience lines: when turned on.
+bool ovCampaignShown() { return gOvFoot; }
+
 void ovSyncFooter() {
     bool want = g.curZone >= 0 || (g.cmpClock == Tracker::Clock::Stopped && Tracker::isCampaign(g.location));
     bool exp = gExpOnOverlay && gExpLevel > 0 && !expNoMonsters();

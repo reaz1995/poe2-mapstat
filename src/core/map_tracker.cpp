@@ -1,4 +1,4 @@
-// Map runs: segments of play time, finishing, hideout returns, General / Summary resets.
+// Map runs: segments of play time, finishing, hideout returns, Maps / Summary resets.
 #include <set>
 
 #include "tracker.h"
@@ -31,7 +31,6 @@ void Tracker::finish(EndReason r, const LogLine* l) {
     history.push_back(cur);
     hasCurrent = false;
     curSub = -1;
-    npcLines.clear();
     if (onHistoryChanged) onHistoryChanged();
 }
 
@@ -48,7 +47,6 @@ void Tracker::startRun(const std::string& area, int level, uint32_t seed, const 
     cur.hideoutName = homeName;
     cur.state = RunState::Loading;
     hasCurrent = true;
-    npcLines.clear();
 }
 
 void Tracker::replaceMaps(const Tracker& src) {
@@ -94,7 +92,6 @@ std::vector<std::pair<const Run*, uint64_t>> Tracker::summaryRuns(uint32_t now) 
 
 void Tracker::resetGeneral() {
     if (hasCurrent) finish(EndReason::Manual, nullptr);  // still counted in Summary
-    npcLines.clear();
     pending = pending == Pending::Run || pending == Pending::SubArea ? Pending::None : pending;
     generalStart = history.size();
     if (onHistoryChanged) onHistoryChanged();

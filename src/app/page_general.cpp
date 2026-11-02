@@ -1,4 +1,4 @@
-// General tab: current map, details, NPC dialogue and the maps of the session.
+// Maps tab: current map, details and the maps of the session.
 #include "app.h"
 
 static int mapCategory(const std::string& a);
@@ -81,20 +81,6 @@ void refreshUi() {
     }
     InvalidateRect(hStatus, nullptr, TRUE);
     InvalidateRect(hTimer, nullptr, FALSE);
-
-    // NPC dialogue
-    int runId = g.hasCurrent ? g.cur.id : -1;
-    if (runId != gNpcRunId || g.npcLines.size() != gNpcShown) {
-        if (runId != gNpcRunId || g.npcLines.size() < gNpcShown || gNpcShown == (size_t)-1) {
-            SendMessageW(hNpc, LB_RESETCONTENT, 0, 0);
-            gNpcShown = 0;
-        }
-        for (size_t i = gNpcShown; i < g.npcLines.size(); ++i)
-            SendMessageW(hNpc, LB_ADDSTRING, 0, (LPARAM)W(g.npcLines[i]).c_str());
-        gNpcShown = g.npcLines.size();
-        gNpcRunId = runId;
-        SendMessageW(hNpc, LB_SETTOPINDEX, gNpcShown ? gNpcShown - 1 : 0, 0);
-    }
 
     // Maps list (#1 at top). The current map gets its row as soon as it is generated and ticks live.
     {

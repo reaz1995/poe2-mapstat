@@ -115,7 +115,6 @@ static void applyTheme() {
         darkControl(lv);
         SetWindowTheme(ListView_GetHeader(lv), gTheme.dark ? L"DarkMode_ItemsView" : L"ItemsView", nullptr);
     }
-    darkControl(hNpc);
     initDarkMode();
     darkTitleBar(hMain);
     if (fOvHead) ovFonts(gOvScale);

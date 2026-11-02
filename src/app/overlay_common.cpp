@@ -118,29 +118,46 @@ void updateOverlayVisibility() {
 
 // Right-click menu of an overlay (Dracula owner-drawn like the column menu).
 void overlayMenu(HWND ov) {
+    enum { CMD_OPEN = 30, CMD_CLOSE, CMD_PAUSE, CMD_STOP, CMD_RESET };
+    // The timer overlay in the campaign also controls the campaign clock: Pause / Resume and Stop, or Reset
+    // (a new run from zero) once it is stopped.
+    bool campaign = ov == hOverlay && ovCampaignShown();
+    bool stopped = g.cmpClock == Tracker::Clock::Stopped;
+    std::vector<std::pair<int, const wchar_t*>> items;  // id 0 = separator
+    if (campaign) {
+        if (!stopped) items.push_back({CMD_PAUSE, g.cmpClock == Tracker::Clock::Paused ? L"Resume" : L"Pause"});
+        items.push_back(stopped ? std::make_pair((int)CMD_RESET, L"Reset") : std::make_pair((int)CMD_STOP, L"Stop"));
+        items.push_back({0, L""});
+    }
+    items.push_back({CMD_OPEN, L"Open Poe2 | MapStat"});
+    items.push_back({0, L""});
+    items.push_back({CMD_CLOSE, L"Close overlay"});
     gMenuItems.clear();
-    gMenuItems.reserve(8);
-    gMenuItems.push_back({L"Open Poe2 | MapStat", false});
-    gMenuItems.push_back({L"", true});
-    gMenuItems.push_back({L"Close overlay", false});
+    gMenuItems.reserve(items.size());  // item data pointers must stay valid while the menu is open
+    for (auto& [id, text] : items) gMenuItems.push_back({text, id == 0});
     HMENU m = CreatePopupMenu();
     MENUINFO mi = {};
     mi.cbSize = sizeof mi;
     mi.fMask = MIM_BACKGROUND;
     mi.hbrBack = brCard;
     SetMenuInfo(m, &mi);
-    AppendMenuW(m, MF_OWNERDRAW, 30, (LPCWSTR)&gMenuItems[0]);
-    AppendMenuW(m, MF_OWNERDRAW | MF_DISABLED, 0, (LPCWSTR)&gMenuItems[1]);
-    AppendMenuW(m, MF_OWNERDRAW, 31, (LPCWSTR)&gMenuItems[2]);
+    for (size_t i = 0; i < items.size(); ++i)
+        AppendMenuW(m, MF_OWNERDRAW | (items[i].first ? 0 : MF_DISABLED), items[i].first, (LPCWSTR)&gMenuItems[i]);
     POINT pt;
     GetCursorPos(&pt);
     SetForegroundWindow(ov);  // so the menu closes when clicking elsewhere
     int cmd = TrackPopupMenu(m, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, ov, nullptr);
     PostMessageW(ov, WM_NULL, 0, 0);
     DestroyMenu(m);
-    if (cmd == 30) {
+    if (cmd == CMD_PAUSE) {
+        campaignAction(HK_PAUSE);
+    } else if (cmd == CMD_STOP) {
+        campaignAction(HK_STOP);
+    } else if (cmd == CMD_RESET) {
+        campaignAction(HK_START);
+    } else if (cmd == CMD_OPEN) {
         showMain();
-    } else if (cmd == 31) {
+    } else if (cmd == CMD_CLOSE) {
         if (ov == hOverlay) {
             showOverlay(false);
             ovIniSet(L"On", 0);
