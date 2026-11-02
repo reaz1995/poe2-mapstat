@@ -60,7 +60,8 @@ bool gAutoUpdate = true;
 HWND hCmpTimerLoad = nullptr;
 HWND hCmpPause = nullptr, hCmpStop = nullptr;
 HWND hLblKeys = nullptr, hKeyLbl[3] = {}, hKeyBtn[3] = {}, hKeysChk = nullptr;
-HWND hTabExp, hExpName, hExpLevel, hExpArea, hExpInfo, hExpRowLbl, hExpOvChk, hExpHint;
+HWND hTabExp, hExpName, hExpLevel, hExpArea, hExpTabEff, hExpMapEff, hExpGain, hExpInfo, hExpRowLbl, hExpOvChk,
+    hExpHint;
 
 HANDLE gMutex = nullptr;
 

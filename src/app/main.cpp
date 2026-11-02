@@ -111,7 +111,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             keyCaptured((UINT)wp, (int)lp);
             return 0;
         case WM_COMMAND:
-            if (HIWORD(wp) == EN_CHANGE && LOWORD(wp) >= ID_EXP_NAME && LOWORD(wp) <= ID_EXP_AREA) {
+            if (HIWORD(wp) == EN_CHANGE && LOWORD(wp) >= ID_EXP_NAME && LOWORD(wp) <= ID_EXP_GAIN) {
                 expEditChanged((HWND)lp);
                 return 0;
             }

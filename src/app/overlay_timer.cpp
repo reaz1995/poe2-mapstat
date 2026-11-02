@@ -41,9 +41,9 @@ static const int kOvFoot = 9 + 19;  // separator + one line
 
 static bool gOvFoot = false;
 
-// Two experience lines under the header (Experience tab): the character level with "Area diff" (how far the current
-// area is past the safe range) and the best area level to level up in. Both with the experience compared to a
-// monster of the character's own level.
+// Two experience lines under the header (Experience tab): the current area level (it moves here from the header) with
+// the character level, and the best area level to level up in. Both with the experience compared to a monster of the
+// character's own level.
 static const int kOvExp = 18;
 static bool gOvExp = false;
 
@@ -104,6 +104,13 @@ static void overlayDataNow(OvLine& head, std::vector<OvLine>& last, COLORREF& ti
                             W(fmtDuration(g.cur.activeAt(now)))});
     } else if (g.hasCurrent) {
         head = {std::to_wstring(g.cur.level), areaName(g.cur.name, g.cur.areaId), W(fmtDuration(g.cur.activeAt(now)))};
+        // In a sub-area: its own name, level and timer. Back in the map the header shows the map time again,
+        // which includes the sub-areas.
+        if (g.inSubArea() && !unnamed(g.locationName, g.location)) {
+            head.lvl = std::to_wstring(g.locationLevel);
+            head.name = areaName(g.locationName, g.location);
+            head.time = W(fmtDuration(g.subAreaAt(now)));
+        }
         timeCol = g.cur.state == RunState::Paused ? C::Orange : g.cur.state == RunState::Loading ? C::Cyan : C::Purple;
     } else {
         head = {L"", W(g.locationName.empty() ? std::string("No active map") : g.locationName), L"00:00"};
@@ -167,19 +174,25 @@ static void paintOverlay(HDC dc, RECT rc) {
         SetTextColor(dc, nameCol);
         DrawTextW(dc, l.name.c_str(), -1, &n, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
     };
-    line(head, P, HH, fOvHead, C::Pink, C::Fg, timeCol);
+    {
+        OvLine h = head;
+        if (gOvExp) h.lvl.clear(), h.range.clear();  // the area level moves to the experience line below
+        line(h, P, HH, fOvHead, C::Pink, C::Fg, timeCol);
+    }
     const int XL = (int)(kOvExp * S), XH = gOvExp ? 2 * XL : 0;
     if (gOvExp) {
-        // Line 1: "Your lvl: 63   Area diff: -9" and the exp bonus of the current area. Area diff = how far the
-        // current area is past the safe range (3 + level / 16 levels around the character): negative and red =
-        // levels outside it, positive = levels left before the penalty starts.
+        // Line 1: "Curr. area: 64 (56-64)  Your lvl: 88" and the exp bonus of the current area. The area level is
+        // red when it is outside the safe range (3 + level / 16 levels around the character), the range in small
+        // print is shown for zones that follow the character level.
         // Line 2: "Best area: 55", the area level with the most experience per monster, and its exp bonus.
         int area = expArea(), range = xp::safeRange(gExpLevel);
         bool below = area > 0 && area < gExpLevel;
         int bound = below ? std::max(1, gExpLevel - range) : gExpLevel + range;
         int margin = below ? area - bound : bound - area;
-        int best = xp::bestArea(gExpLevel);
-        double mArea = area > 0 ? xp::expectedMultiplier(gExpLevel, area) : 1.0, mBest = xp::expectedMultiplier(gExpLevel, best);
+        const double bonus = expEffMult() * expGainMult();  // tablets and map mods
+        int best = xp::bestArea(gExpLevel, bonus);
+        double mArea = area > 0 ? xp::expectedMultiplier(gExpLevel, area, bonus) : bonus,
+               mBest = xp::expectedMultiplier(gExpLevel, best, bonus);
         std::wstring vArea = expPct(mArea), vBest = expPct(mBest);
         SelectObject(dc, fOvSmall);
         SIZE w1, w2;  // both "Exp bonus:" labels start at the same x: right of them room for the wider value
@@ -188,38 +201,67 @@ static void paintOverlay(HDC dc, RECT rc) {
         const int valueW = std::max(w1.cx, w2.cx);
         // Draws "caption value" pairs from the left (caption grey), then "Exp bonus: x%" aligned right.
         struct Part {
-            std::wstring caption, value;
+            std::wstring caption, shortCaption, value;
             COLORREF col;
+            std::wstring small = L"";  // drawn in the tiny font after the value, e.g. "(56-64)"
         };
-        auto expLine = [&](int y, std::initializer_list<Part> parts, double m, const std::wstring& val) {
+        std::wstring lvlRange = g.curZone >= 0 ? W(g.levelRange(g.zones[g.curZone].areaId)) : L"";
+        std::vector<Part> line1 = {{L"Curr. area:", L"Area:", area > 0 ? std::to_wstring(area) : std::wstring(L"-"),
+                                    area > 0 && margin < 0 ? C::Red : C::Pink, lvlRange},
+                                   {L"Your lvl:", L"Lvl:", std::to_wstring(gExpLevel), C::Green}};
+        std::vector<Part> line2 = {{L"Best area:", L"Best:", W(xp::bestAreaText(gExpLevel, bonus)), C::Green}};
+        const int gap = (int)(10 * S);
+        auto textW = [&](const std::wstring& t, HFONT f) {
+            SelectObject(dc, f);
+            SIZE sz;
+            GetTextExtentPoint32W(dc, t.c_str(), (int)t.size(), &sz);
+            SelectObject(dc, fOvSmall);
+            return (int)sz.cx;
+        };
+        // Width of the left part of a line; `shortCaps` uses the short captions ("Area:", "Lvl:").
+        auto partsW = [&](const std::vector<Part>& parts, bool shortCaps) {
+            int w = 0;
+            for (const Part& p : parts) {
+                w += textW((shortCaps ? p.shortCaption : p.caption) + L" ", fOvSmall) + textW(p.value, fOvSmall) + gap;
+                if (!p.small.empty()) w += textW(L" (" + p.small + L")", fOvTiny);
+            }
+            return w;
+        };
+        // Short captions when the full ones do not fit next to the exp bonus (narrow overlay).
+        const int avail = rc.right - 2 * P;
+        bool shortCaps = partsW(line1, false) + textW(L"Exp bonus: ", fOvSmall) + valueW > avail;
+        const std::wstring bonusCap = shortCaps ? L"Exp:" : L"Exp bonus:";
+        auto expLine = [&](int y, const std::vector<Part>& parts, double m, const std::wstring& val) {
             RECT r = {P, y, rc.right - P, y + XL};
             int x = P;
             for (const Part& p : parts) {
-                std::wstring cap = p.caption + L" ";
-                SIZE cw, vw;
-                GetTextExtentPoint32W(dc, cap.c_str(), (int)cap.size(), &cw);
-                GetTextExtentPoint32W(dc, p.value.c_str(), (int)p.value.size(), &vw);
+                std::wstring cap = (shortCaps ? p.shortCaption : p.caption) + L" ";
                 RECT rp = {x, y, rc.right - P, y + XL};
                 SetTextColor(dc, C::Comment);
                 DrawTextW(dc, cap.c_str(), -1, &rp, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-                rp.left += cw.cx;
+                rp.left += textW(cap, fOvSmall);
                 SetTextColor(dc, p.col);
                 DrawTextW(dc, p.value.c_str(), -1, &rp, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-                x = rp.left + vw.cx + (int)(10 * S);
+                rp.left += textW(p.value, fOvSmall);
+                if (!p.small.empty()) {
+                    std::wstring sm = L" (" + p.small + L")";
+                    SelectObject(dc, fOvTiny);
+                    SetTextColor(dc, C::Comment);
+                    DrawTextW(dc, sm.c_str(), -1, &rp, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                    SelectObject(dc, fOvSmall);
+                    rp.left += textW(sm, fOvTiny);
+                }
+                x = rp.left + gap;
             }
             SetTextColor(dc, m > 1.0005 ? C::Green : m < 0.9995 ? C::Red : C::Fg);
             DrawTextW(dc, val.c_str(), -1, &r, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
             RECT rl = r;
             rl.right -= valueW + (int)(5 * S);
             SetTextColor(dc, C::Comment);
-            DrawTextW(dc, L"Exp bonus:", -1, &rl, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+            DrawTextW(dc, bonusCap.c_str(), -1, &rl, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
         };
-        std::wstring diff = area > 0 ? (margin > 0 ? L"+" : L"") + std::to_wstring(margin) : L"-";
-        expLine(P + HH,
-                {{L"Your lvl:", std::to_wstring(gExpLevel), C::Green},
-                 {L"Area diff:", diff, area > 0 && margin < 0 ? C::Red : C::Fg}},
-                mArea, vArea);
-        expLine(P + HH + XL, {{L"Best area:", W(xp::bestAreaText(gExpLevel)), C::Green}}, mBest, vBest);
+        expLine(P + HH, line1, mArea, vArea);
+        expLine(P + HH + XL, line2, mBest, vBest);
     }
     HBRUSH b;
     if (gOvRecords > 0) {

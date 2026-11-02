@@ -21,21 +21,26 @@ double penaltyMultiplier(int charLevel, int areaLevel);
 // level 15 (about 0.03 exp after the penalty) start to give experience, level 14 and lower (about 0.025) do not.
 constexpr double kNoExpBelow = 0.028;
 
-// Experience from a normal monster of the area level after the penalty (0 below kNoExpBelow).
-inline double expectedExp(int charLevel, int areaLevel) {
-    double e = monsterExp(areaLevel) * penaltyMultiplier(charLevel, areaLevel);
+// Monster Effectiveness (waystones, tablets, atlas passives): every 2% increased Effectiveness gives monsters 1% more
+// experience, so 200% Effectiveness = x2 experience.
+inline double effectivenessMultiplier(int effectivenessPct) { return 1.0 + (effectivenessPct / 2) / 100.0; }
+
+// Experience from a normal monster of the area level after the penalty, times `bonus` (effectiveness and increased
+// experience gain from tablets / map mods, 1.0 = none). 0 below kNoExpBelow.
+inline double expectedExp(int charLevel, int areaLevel, double bonus = 1.0) {
+    double e = monsterExp(areaLevel) * penaltyMultiplier(charLevel, areaLevel) * bonus;
     return e < kNoExpBelow ? 0.0 : e;
 }
 
 // Area level (1-99) with the most experience per monster for this character; the lowest one on a tie.
-int bestArea(int charLevel);
+int bestArea(int charLevel, double bonus = 1.0);
 
 // The best area as text: "55", or a range like "89-99" when several levels in a row give the same experience.
-std::string bestAreaText(int charLevel);
+std::string bestAreaText(int charLevel, double bonus = 1.0);
 
-// The same compared to a monster of the character's own level (1.0 = the same, 1.2 = 20% more).
-inline double expectedMultiplier(int charLevel, int areaLevel) {
-    return expectedExp(charLevel, areaLevel) / monsterExp(charLevel);
+// The same compared to a monster of the character's own level without bonuses (1.0 = the same, 1.2 = 20% more).
+inline double expectedMultiplier(int charLevel, int areaLevel, double bonus = 1.0) {
+    return expectedExp(charLevel, areaLevel, bonus) / monsterExp(charLevel);
 }
 
 }  // namespace xp

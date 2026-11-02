@@ -5,6 +5,7 @@
 
 std::wstring gExpName;
 int gExpLevel = 0;
+int gTabEff = 0, gMapEff = 0, gExpGain = 0;
 bool gExpOnOverlay = false;
 
 static int gExpArea = 0;             // area level used for the calculation
@@ -40,15 +41,19 @@ std::wstring expPct(double m) {
 
 static std::wstring pct(double m) { return expPct(m); }
 
-// Experience per monster of the area level after the penalty: 2 decimals below 100, grouped above.
 static std::wstring grouped(uint64_t v);
 
-static std::wstring perMonster(int charLevel, int areaLevel) {
-    double per = xp::expectedExp(charLevel, areaLevel);
-    if (per >= 100) return grouped((uint64_t)(per + 0.5));
+// Experience amount as text: 2 decimals below 100, grouped above.
+static std::wstring num(double v) {
+    if (v >= 100) return grouped((uint64_t)(v + 0.5));
     wchar_t b[32];
-    swprintf(b, 32, L"%.2f", per);
+    swprintf(b, 32, L"%.2f", v);
     return b;
+}
+
+// Experience per monster of the area level after the penalty and the tablet / map bonuses.
+static std::wstring perMonster(int charLevel, int areaLevel) {
+    return num(xp::expectedExp(charLevel, areaLevel, expEffMult() * expGainMult()));
 }
 
 static std::wstring grouped(uint64_t v) {
@@ -66,9 +71,15 @@ bool expNoMonsters() {
 // Area level used on the Experience tab and the overlay: follows the game, or what was typed until the next area.
 int expArea() { return gExpArea; }
 
-// Area level of what the timer overlay shows: campaign zone, current or paused map, else where the player is.
+// Both multiply the experience, so the order does not change the result: effectiveness scales the monster's
+// base experience, increased experience gain applies to what is left after the level penalty.
+double expEffMult() { return xp::effectivenessMultiplier(gTabEff + gMapEff); }
+double expGainMult() { return 1.0 + gExpGain / 100.0; }
+
+// Area level of what the timer overlay shows: campaign zone, sub-area, current or paused map, else where the player is.
 int expAreaLevel() {
     if (g.curZone >= 0) return g.zones[g.curZone].level;
+    if (g.inSubArea()) return g.locationLevel;  // Abyssal Depths etc. have their own level
     if (g.hasCurrent) return g.cur.level;
     return g.locationLevel;
 }
@@ -79,6 +90,12 @@ void loadExperience() {
     gExpName = b;
     gExpLevel = std::clamp((int)GetPrivateProfileIntW(L"experience", L"Level", 0, iniPath().c_str()), 0, 100);
     gExpOnOverlay = GetPrivateProfileIntW(L"experience", L"Overlay", 0, iniPath().c_str()) != 0;
+    auto pctIni = [](const wchar_t* key, int def) {
+        return std::max(0, (int)GetPrivateProfileIntW(L"experience", key, def, iniPath().c_str()));
+    };
+    gTabEff = pctIni(L"TabletEffectiveness", 0);
+    gMapEff = pctIni(L"MapEffectiveness", 0);
+    gExpGain = pctIni(L"TabletExpGain", 0);
     g.onLevelUp = [](const std::string& name, int level) {
         if (gExpName.empty() || _wcsicmp(W(name).c_str(), gExpName.c_str()) != 0) return;
         gExpLevel = level;
@@ -100,32 +117,43 @@ void refreshExperience() {
     std::wstring v;
     int cl = gExpLevel, al = gExpArea;
     if (cl < 1) {
-        v = L"-\r\n-\r\n-\r\n-\r\n-\r\n-";
+        v = L"-\r\n-\r\n-\r\n-\r\n-\r\n-\r\n-\r\n-";
     } else {
         int safe = xp::safeRange(cl);
-        v = cl < 100 ? grouped(xp::toNextLevel(cl)) + L"   (level " + std::to_wstring(cl) + L" to " + std::to_wstring(cl + 1) + L")"
-                    : std::wstring(L"max level");
-        v += L"\r\n±" + std::to_wstring(safe) + L" levels   (areas " + std::to_wstring(std::max(1, cl - safe)) + L" to " +
-             std::to_wstring(cl + safe) + L" give no penalty)";
+        v = cl < 100 ? grouped(xp::toNextLevel(cl)) + L"   (level " + std::to_wstring(cl) + L" to " +
+                           std::to_wstring(cl + 1) + L")"
+                     : std::wstring(L"max level");
+        v += L"\r\n±" + std::to_wstring(safe) + L" levels   (areas " + std::to_wstring(std::max(1, cl - safe)) +
+             L" to " + std::to_wstring(cl + safe) + L" give no penalty)";
+        // Order: monster base exp -> effectiveness -> level penalty -> increased exp gain -> expected exp.
+        const double eff = expEffMult(), gain = expGainMult(), bonus = eff * gain;
+        wchar_t b[160];
         if (al < 1) {
-            v += L"\r\n-\r\n-\r\n-";
+            v += L"\r\n-\r\n-\r\n-\r\n-\r\n-";
         } else {
             int base = xp::monsterExp(al), own = xp::monsterExp(cl);
-            double pm = xp::penaltyMultiplier(cl, al), em = xp::expectedMultiplier(cl, al);
-            wchar_t b[96];
-            swprintf(b, 96, L"%ls   (area %d;  %ls at your level %d)", grouped(base).c_str(), al, grouped(own).c_str(), cl);
+            double pm = xp::penaltyMultiplier(cl, al);
+            swprintf(b, 160, L"%ls   (area %d;  %ls at your level %d)", grouped(base).c_str(), al, grouped(own).c_str(),
+                     cl);
+            v += L"\r\n" + std::wstring(b);
+            swprintf(b, 160, L"%d%%   |   base exp %ls -> %ls", gTabEff + gMapEff, grouped(base).c_str(),
+                     grouped((uint64_t)(base * eff + 0.5)).c_str());
             v += L"\r\n" + std::wstring(b);
             int ed = std::max(std::abs(cl - al) - safe, 0);
-            swprintf(b, 96, L"x%.4f   (%ls)   %d levels outside the safe range", pm, pct(pm).c_str(), ed);
+            swprintf(b, 160, L"x%.4f   (%ls)   %d levels outside the safe range", pm, pct(pm).c_str(), ed);
             v += L"\r\n" + std::wstring(b);
-            swprintf(b, 96, L"%ls per monster   (%ls vs a monster of your level)", perMonster(cl, al).c_str(), pct(em).c_str());
+            double afterPenalty = base * eff * pm;
+            swprintf(b, 160, L"%d%%   |   exp after penalties %ls -> %ls", gExpGain, num(afterPenalty).c_str(),
+                     num(afterPenalty * gain).c_str());
+            v += L"\r\n" + std::wstring(b);
+            swprintf(b, 160, L"%ls per monster   (%ls vs a monster of your level)", perMonster(cl, al).c_str(),
+                     pct(xp::expectedMultiplier(cl, al, bonus)).c_str());
             v += L"\r\n" + std::wstring(b);
         }
-        int best = xp::bestArea(cl);
-        wchar_t b[96];
-        swprintf(b, 96, L"area %ls:   %ls per monster   (%ls vs a monster of your level)",
-                 W(xp::bestAreaText(cl)).c_str(), perMonster(cl, best).c_str(),
-                 pct(xp::expectedMultiplier(cl, best)).c_str());
+        int best = xp::bestArea(cl, bonus);
+        swprintf(b, 160, L"area %ls:   %ls per monster   (%ls vs a monster of your level)",
+                 W(xp::bestAreaText(cl, bonus)).c_str(), perMonster(cl, best).c_str(),
+                 pct(xp::expectedMultiplier(cl, best, bonus)).c_str());
         v += L"\r\n" + std::wstring(b);
     }
     setTextIfChanged(hExpInfo, v);
@@ -142,6 +170,13 @@ void expEditChanged(HWND h) {
         iniSet(L"Level", std::to_wstring(gExpLevel));
     } else if (h == hExpArea) {
         gExpArea = std::clamp(_wtoi(t.c_str()), 0, 100);
+    } else if (h == hExpTabEff || h == hExpMapEff || h == hExpGain) {
+        int v = std::clamp(_wtoi(t.c_str()), 0, 9999);
+        (h == hExpTabEff ? gTabEff : h == hExpMapEff ? gMapEff : gExpGain) = v;
+        iniSet(h == hExpTabEff   ? L"TabletEffectiveness"
+               : h == hExpMapEff ? L"MapEffectiveness"
+                                 : L"TabletExpGain",
+               std::to_wstring(v));
     }
     refreshExperience();
     ovSyncFooter();
