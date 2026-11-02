@@ -16,9 +16,14 @@ int monsterExp(int level);
 // safe range. 1.0 inside the safe range. No 1% minimum: far outside the range the game gives no experience.
 double penaltyMultiplier(int charLevel, int areaLevel);
 
-// Experience from a monster of the area level after the penalty.
+// Below this much experience per normal monster the game gives nothing. Estimated in game: at level 98 monsters of
+// level 15 (about 0.03 exp after the penalty) start to give experience, level 14 and lower (about 0.025) do not.
+constexpr double kNoExpBelow = 0.028;
+
+// Experience from a normal monster of the area level after the penalty (0 below kNoExpBelow).
 inline double expectedExp(int charLevel, int areaLevel) {
-    return monsterExp(areaLevel) * penaltyMultiplier(charLevel, areaLevel);
+    double e = monsterExp(areaLevel) * penaltyMultiplier(charLevel, areaLevel);
+    return e < kNoExpBelow ? 0.0 : e;
 }
 
 // Area level (1-99) with the most experience per monster for this character; the lowest one on a tie.
