@@ -3,11 +3,22 @@
 
 static HWND hExpCap[3];  // captions above the Experience inputs
 
+// Maps tab has two sub-pages (Session, Summary); the tab opens the one that was shown last.
+static int gMapsPage = PG_GENERAL;
+
+void showMapsPage() { showPage(gMapsPage); }
+
 void showPage(int p) {
     gPage = p;
+    bool maps = p == PG_GENERAL || p == PG_SUMMARY;
+    if (maps) gMapsPage = p;
     for (int i = 0; i < PG_COUNT; ++i)
         for (HWND h : gPages[i]) ShowWindow(h, i == p ? SW_SHOW : SW_HIDE);
-    for (HWND h : {hTabGen, hTabSum, hTabCmp, hTabExp, hGear}) InvalidateRect(h, nullptr, FALSE);
+    for (HWND h : {hSubSession, hSubSummary}) {
+        ShowWindow(h, maps ? SW_SHOW : SW_HIDE);
+        InvalidateRect(h, nullptr, FALSE);
+    }
+    for (HWND h : {hTabGen, hTabCmp, hTabExp, hGear}) InvalidateRect(h, nullptr, FALSE);
     if (p == PG_EXPERIENCE) refreshExperience();
     InvalidateRect(hMain, nullptr, TRUE);
     if (p == PG_SUMMARY) refreshSummary();
@@ -21,14 +32,16 @@ void layout(int w, int h) {
 
     // tab bar
     place(hTabGen, 8, 0, 100, kTabBarH);
-    place(hTabSum, 108, 0, 110, kTabBarH);
-    place(hTabCmp, 218, 0, 116, kTabBarH);
-    place(hTabExp, 334, 0, 122, kTabBarH);
+    place(hTabCmp, 108, 0, 116, kTabBarH);
+    place(hTabExp, 224, 0, 122, kTabBarH);
     place(hGear, w - kTabBarH - 6, 0, kTabBarH, kTabBarH);
     if (hUpdTab) place(hUpdTab, w - kTabBarH - 6 - 170, 0, 166, kTabBarH);  // just left of the gear
 
-    // ---- General
-    int y = T;
+    // ---- Maps: sub-tabs Session / Summary on top of both pages
+    place(hSubSession, L, T, 100, 30);
+    place(hSubSummary, L + 108, T, 106, 30);
+    const int MT = T + 44;  // content of the Maps pages starts under the sub-tabs
+    int y = MT;
     place(hTitle, L, y, CW - 260, 40);
     place(hTimer, R - 250, y - 6, 250, 72);
     place(hStatus, L, y + 42, CW - 260, 22);
@@ -43,11 +56,6 @@ void layout(int w, int h) {
     y += rh + 8;
     place(hLoadHist, L, y, 476, rh);  // under the three buttons, same width as the row
     y += rh + 14;
-    place(hLblNpc, L, y, CW, 18);
-    y += 22;
-    card(PG_GENERAL, L, y, CW, 96);
-    place(hNpc, L + pad, y + 6, CW - 2 * pad, 84);
-    y += 96 + 14;
     place(hLblHist, L, y + 2, 70, 18);
     place(hSummary, L + 75, y, CW - 75, 22);
     y += 26;
@@ -56,13 +64,12 @@ void layout(int w, int h) {
     place(hHist, L + 6, y + 6, CW - 12, hh - 12);
 
     // ---- Summary
-
-    place(hSumReset, R - 286, T, 140, rh);
-    place(hExpSum, R - 138, T, 138, rh);
-    place(hLblSum, L, T + rh + 16, 130, 18);
-    place(hSumHdr, L + 135, T + rh + 14, CW - 135, 22);
+    place(hSumReset, R - 286, T - 1, 140, rh);  // on the sub-tab row
+    place(hExpSum, R - 138, T - 1, 138, rh);
+    place(hLblSum, L, MT + 2, 130, 18);
+    place(hSumHdr, L + 135, MT, CW - 135, 22);
     {
-        int sy = T + rh + 42;
+        int sy = MT + 28;
         card(PG_SUMMARY, L, sy, CW, B - sy);
         place(hSumList, L + 6, sy + 6, CW - 12, B - sy - 12);
     }
@@ -90,6 +97,8 @@ void layout(int w, int h) {
 
     // ---- Experience
     y = T;
+    place(hExpHint, L, y, CW, 20);  // one line of help above the inputs
+    y += 30;
     {
         int x = L;
         struct { HWND e; int w; } f[] = {{hExpName, 260}, {hExpLevel, 80}, {hExpArea, 80}};
@@ -107,8 +116,6 @@ void layout(int w, int h) {
         place(hExpInfo, L + pad + 180, y + pad, CW - 2 * pad - 184, 6 * 20);
         y += 6 * 20 + 2 * pad + 16;
         place(hExpOvChk, L, y, 420, 26);
-        y += 40;
-        place(hExpHint, L, y, CW, 60);
     }
 
     // ---- Options
@@ -136,11 +143,13 @@ void layout(int w, int h) {
     y += 44;
     place(hLblKeys, L, y, CW, 18);
     y += 26;
-    for (int i = 0, x = L; i < HK_COUNT; ++i, x += 260) {
-        place(hKeyLbl[i], x, y + 4, 110, 20);
-        place(hKeyBtn[i], x + 112, y - 3, 130, rh);
+    place(hKeysChk, L, y, 260, 26);
+    y += 36;
+    for (int i = 0; i < HK_COUNT; ++i, y += rh + 6) {  // one column: name, key
+        place(hKeyLbl[i], L, y + 6, 130, 20);
+        place(hKeyBtn[i], L + 140, y, 140, rh);
     }
-    y += rh + 20;
+    y += 14;
     place(hLblTheme, L, y, CW, 18);
     y += 26;
     place(hThemeSel, L, y, 240, rh);
@@ -166,8 +175,9 @@ void createControls() {
     makeFonts();
 
     // tab bar
-    hTabGen = btn(L"General", ID_TAB_GEN, -1, Btn::Tab);
-    hTabSum = btn(L"Summary", ID_TAB_SUM, -1, Btn::Tab);
+    hTabGen = btn(L"Maps", ID_TAB_GEN, -1, Btn::Tab);
+    hSubSession = btn(L"Session", ID_TAB_SES, -1, Btn::Pill);
+    hSubSummary = btn(L"Summary", ID_TAB_SUM, -1, Btn::Pill);
     hTabCmp = btn(L"Campaign", ID_TAB_CMP, -1, Btn::Tab);
     hTabExp = btn(L"Experience", ID_TAB_EXP, -1, Btn::Tab);
     hGear = btn(L"", ID_GEAR, -1, Btn::Gear);
@@ -175,7 +185,7 @@ void createControls() {
     hUpdTab = btn(L"Check for updates", ID_UPD_TAB, -1, Btn::Tab);
 #endif
 
-    // General
+    // Maps
     hTitle = label(L"", ID_TITLE, fTitle, PG_GENERAL, false, SS_ENDELLIPSIS);
     hTimer = mk(L"STATIC", L"00:00", SS_RIGHT, ID_TIMER, fTimer, PG_GENERAL);
     hStatus = label(L"", ID_STATUS, fBold, PG_GENERAL);
@@ -184,9 +194,6 @@ void createControls() {
     hGenReset = btn(L"Reset Session", ID_GEN_RESET, PG_GENERAL, Btn::Danger);
     hExpGen = btn(L"Export to CSV", ID_EXP_GEN, PG_GENERAL, Btn::Accent);
     hSummary = label(L"", ID_SUMMARY, fBold, PG_GENERAL, false, SS_ENDELLIPSIS);
-    hLblNpc = label(L"NPC DIALOGUE", ID_LBL_NPC, fSection, PG_GENERAL);
-    hNpc = mk(L"LISTBOX", L"", WS_VSCROLL | LBS_NOINTEGRALHEIGHT | LBS_NOSEL, ID_NPC, fNormal, PG_GENERAL);
-    darkControl(hNpc);
     hLblHist = label(L"MAPS", ID_LBL_HIST, fSection, PG_GENERAL);
     const wchar_t* hc[] = {L"#", L"Map", L"Area Lvl", L"Area ID", L"Seed", L"Entered", L"Load", L"Map time", L"Entries"};
     hHist = list(ID_HIST, PG_GENERAL, hc, kHistW, 9, 0b111110100);
@@ -243,13 +250,12 @@ void createControls() {
                        ID_EXP_ROWLBL, fNormal, PG_EXPERIENCE, true);
     hExpInfo = label(L"", ID_EXP_INFO, fNormal, PG_EXPERIENCE, true);
     hExpOvChk = btn(L"Show safe area level and exp bonus on MapTimerOverlay", ID_EXP_OVCHK, PG_EXPERIENCE, Btn::Check);
-    hExpHint = label(L"The level updates by itself when the log says \"<name> (<class>) is now level N\" for this name.\r\n"
-                     L"Area level follows the current map or zone; type another one to compare. Monster base exp is the "
-                     L"poe2db Experience base stat for that monster level (each monster multiplies it by its own factor). "
-                     L"Penalty: ((L + 5) / (L + 5 + ED^2.5))^1.5, ED = levels outside the safe range of 3 + level / 16.",
-                     ID_EXP_HINT, fNormal, PG_EXPERIENCE);
+    hExpHint = label(L"Enter your character name and the level updates by itself on every level up.", ID_EXP_HINT,
+                     fNormal, PG_EXPERIENCE);
 
-    hLblKeys = label(L"HOTKEYS   \u00b7   campaign timer, work while the game or this app is in front", ID_LBL_KEYS, fSection, PG_OPTIONS);
+    hLblKeys = label(L"HOTKEYS   \u00b7   campaign timer, work while the game or this app is in front", ID_LBL_KEYS,
+                     fSection, PG_OPTIONS);
+    hKeysChk = btn(L"Enable hotkeys", ID_KEYS_CHK, PG_OPTIONS, Btn::Check);
     {
         const wchar_t* names[HK_COUNT] = {L"Stop", L"Pause / resume", L"Start new run"};
         for (int i = 0; i < HK_COUNT; ++i) {

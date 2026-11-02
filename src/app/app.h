@@ -40,11 +40,79 @@ extern COLORREF Bg, Card, Darkest, Line, Stripe, Fg, Comment, Cyan, Green, Orang
 }  // namespace C
 
 enum {
-    ID_PATH = 101, ID_BROWSE, ID_RELOAD, ID_ONTOP,
-    ID_TITLE, ID_STATUS, ID_TIMER, ID_DETLBL, ID_DETAILS, ID_SUMMARY, ID_NPC, ID_HIST, ID_LBL_NPC, ID_LBL_HIST,
-    ID_TAB_GEN, ID_TAB_SUM, ID_TAB_CMP, ID_GEAR,
-    ID_SUMHDR, ID_SUMLIST, ID_LBL_PATH, ID_OPT_INFO, ID_EXP_GEN, ID_EXP_SUM, ID_EXP_CMP, ID_GEN_RESET, ID_SUM_RESET,
-    ID_CMP_TITLE, ID_CMP_TIMER, ID_CMP_STATUS, ID_CMP_LIST, ID_CMP_RESET, ID_LBL_CMP, ID_LBL_SUM, ID_CMP_SUM, ID_OPT_LBL, ID_LOAD_HIST, ID_RESTORE_GEN, ID_RESTORE_CMP, ID_OVERLAY, ID_LBL_OVERLAY, ID_REC_LBL, ID_REC_MINUS, ID_REC_VAL, ID_REC_PLUS, ID_CLOSE_CHK, ID_EXIT, ID_CMDBAR, ID_LBL_THEME, ID_THEME_SEL, ID_LBL_UPD, ID_UPD_CHK, ID_UPD_INFO, ID_UPD_TAB, ID_CMP_TIMER_LOAD, ID_CMP_PAUSE, ID_CMP_STOP, ID_LBL_KEYS, ID_KEY_LBL0, ID_KEY_LBL1, ID_KEY_LBL2, ID_KEY_BTN0, ID_KEY_BTN1, ID_KEY_BTN2, ID_TAB_EXP, ID_EXP_NAME, ID_EXP_LEVEL, ID_EXP_AREA, ID_EXP_LBLS, ID_EXP_INFO, ID_EXP_ROWLBL, ID_EXP_OVCHK, ID_EXP_HINT,
+    ID_PATH = 101,
+    ID_BROWSE,
+    ID_RELOAD,
+    ID_ONTOP,
+    ID_TITLE,
+    ID_STATUS,
+    ID_TIMER,
+    ID_DETLBL,
+    ID_DETAILS,
+    ID_SUMMARY,
+    ID_HIST,
+    ID_LBL_HIST,
+    ID_TAB_GEN,
+    ID_TAB_SUM,
+    ID_TAB_SES,
+    ID_TAB_CMP,
+    ID_GEAR,
+    ID_SUMHDR,
+    ID_SUMLIST,
+    ID_LBL_PATH,
+    ID_OPT_INFO,
+    ID_EXP_GEN,
+    ID_EXP_SUM,
+    ID_EXP_CMP,
+    ID_GEN_RESET,
+    ID_SUM_RESET,
+    ID_CMP_TITLE,
+    ID_CMP_TIMER,
+    ID_CMP_STATUS,
+    ID_CMP_LIST,
+    ID_CMP_RESET,
+    ID_LBL_CMP,
+    ID_LBL_SUM,
+    ID_CMP_SUM,
+    ID_OPT_LBL,
+    ID_LOAD_HIST,
+    ID_RESTORE_GEN,
+    ID_RESTORE_CMP,
+    ID_OVERLAY,
+    ID_LBL_OVERLAY,
+    ID_REC_LBL,
+    ID_REC_MINUS,
+    ID_REC_VAL,
+    ID_REC_PLUS,
+    ID_CLOSE_CHK,
+    ID_EXIT,
+    ID_CMDBAR,
+    ID_LBL_THEME,
+    ID_THEME_SEL,
+    ID_LBL_UPD,
+    ID_UPD_CHK,
+    ID_UPD_INFO,
+    ID_UPD_TAB,
+    ID_CMP_TIMER_LOAD,
+    ID_CMP_PAUSE,
+    ID_CMP_STOP,
+    ID_LBL_KEYS,
+    ID_KEY_LBL0,
+    ID_KEY_LBL1,
+    ID_KEY_LBL2,
+    ID_KEY_BTN0,
+    ID_KEY_BTN1,
+    ID_KEY_BTN2,
+    ID_KEYS_CHK,
+    ID_TAB_EXP,
+    ID_EXP_NAME,
+    ID_EXP_LEVEL,
+    ID_EXP_AREA,
+    ID_EXP_LBLS,
+    ID_EXP_INFO,
+    ID_EXP_ROWLBL,
+    ID_EXP_OVCHK,
+    ID_EXP_HINT,
     ID_ACT_FIRST = 2000,
     ID_TIMER_POLL = 1, ID_TIMER_UPD = 2
 };
@@ -60,7 +128,7 @@ static const UINT WM_TRAY = WM_APP + 1, WM_SHOWMAIN = WM_APP + 2;
 // button looks
 enum class Btn { Normal, Danger, Accent, Tab, Gear, Check, Pill };
 
-// General tab filter by map category (right-click on the Map column)
+// Maps tab filter by map category (right-click on the Map column)
 enum { CAT_ALL = 0, CAT_MAPS, CAT_EXPEDITION, CAT_SPECIAL };
 
 static const wchar_t* kCatName[] = {L"All", L"Maps", L"Expedition", L"Special"};
@@ -69,7 +137,7 @@ static const UINT WM_IMPORTED = WM_APP + 3;
 static const UINT WM_HOTKEY_ACT = WM_APP + 21, WM_KEY_CAPTURED = WM_APP + 22;
 
 // Stored data: three kinds of files in %APPDATA%\Poe2MapStat\sessions, named by prefix + start date:
-//   "MapSession <date>.tsv"       maps of the General tab
+//   "MapSession <date>.tsv"       maps of the Maps tab
 //   "CampaignSession <date>.tsv"  campaign zones
 //   "SummarySession <date>.tsv"   what Summary counts
 // A reset keeps the old file (state before the reset) and continues in a new one, so each part can be restored.
@@ -105,6 +173,7 @@ static const wchar_t* kCbSec = L"CommandBarOverlay";
 struct ImportResult {
     std::string data, firstDate, err, source;
     std::map<std::string, std::string> names;
+    std::map<std::string, std::pair<int, int>> levels;  // campaign area level ranges seen
     uint64_t lines = 0;
 };
 
@@ -120,8 +189,9 @@ extern std::string gThemeKey;  // embedded theme file name ("" = default Dracula
 extern std::wstring gFontUi, gFontMono;
 extern HBRUSH brBg, brCard, brDarkest;
 extern HWND hMain;
-extern HWND hTabGen, hTabSum, hTabCmp, hGear;
-extern HWND hTitle, hStatus, hTimer, hDetLbl, hDetails, hSummary, hNpc, hHist, hLblNpc, hLblHist;
+extern HWND hTabGen, hTabCmp, hGear;
+extern HWND hSubSession, hSubSummary;  // Maps tab: Session / Summary sub-tabs
+extern HWND hTitle, hStatus, hTimer, hDetLbl, hDetails, hSummary, hHist, hLblHist;
 extern HWND hGenReset, hExpGen;
 extern HWND hSumHdr, hSumList, hSumReset, hExpSum, hLblSum;
 extern HWND hCmpTitle, hCmpTimer, hCmpStatus, hCmpList, hCmpReset, hExpCmp, hLblCmp, hCmpSum;
@@ -143,7 +213,8 @@ extern HWND hLblUpd, hUpdChk, hUpdInfo, hUpdTab;
 extern bool gAutoUpdate;
 extern HWND hCmpTimerLoad;  // Campaign: zone time including its loading screens
 extern HWND hCmpPause, hCmpStop;
-extern HWND hLblKeys, hKeyLbl[3], hKeyBtn[3];
+extern HWND hLblKeys, hKeyLbl[3], hKeyBtn[3], hKeysChk;
+extern bool gHotkeysOn;  // Options: hotkeys enabled
 extern HWND hTabExp, hExpName, hExpLevel, hExpArea, hExpInfo, hExpRowLbl, hExpOvChk, hExpHint;
 extern std::wstring gExpName;
 extern int gExpLevel;
@@ -160,14 +231,12 @@ extern uint64_t gOffset;
 extern std::string gHead;  // first bytes of the log: changes when the game starts a new session/file
 extern std::string gPartial;
 extern bool gHistDirty, gFileOk;
-extern size_t gNpcShown;
-extern int gNpcRunId;
 extern std::vector<std::string> gActs;  // act sub-tabs on the Campaign page
 extern std::vector<HWND> gActBtns;
 extern std::string gSelAct, gCmpShownAct;
 extern std::vector<int> gCmpRows;  // list row -> zone index
 extern int gLastCurZone;
-extern int gHistCurRow;  // General list: row of the map being played
+extern int gHistCurRow;  // Maps list: row of the map being played
 extern int gActRowX, gActRowY;
 extern std::map<HWND, unsigned> gHiddenCols;
 extern int gMapFilter;
@@ -282,6 +351,7 @@ std::wstring hotkeyName(int i);
 void beginKeyCapture(int i);
 void keyCaptured(UINT vk, int mods);
 void campaignAction(int i);
+void toggleHotkeys();
 
 // ---------------------------------------------------------------- page_experience.cpp
 int expAreaLevel();
@@ -299,6 +369,7 @@ void refreshCampaign(bool force);
 void placeActs();
 
 // ---------------------------------------------------------------- layout.cpp
+void showMapsPage();  // Maps tab: the sub-page shown last (Session or Summary)
 void showPage(int p);
 void layout(int w, int h);
 void createControls();
@@ -319,6 +390,7 @@ void ovFonts(double sc);
 void saveOverlayPos();
 void setOverlayRecords(int n);
 void ovSyncFooter();
+bool ovCampaignShown();  // the timer overlay shows the campaign (footer visible)
 void showOverlay(bool on);
 
 // ---------------------------------------------------------------- overlay_cmdbar.cpp

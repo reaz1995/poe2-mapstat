@@ -15,9 +15,10 @@ HBRUSH brBg, brCard, brDarkest;
 
 HWND hMain;
 
-HWND hTabGen, hTabSum, hTabCmp, hGear;
+HWND hTabGen, hTabCmp, hGear;
+HWND hSubSession, hSubSummary;
 
-HWND hTitle, hStatus, hTimer, hDetLbl, hDetails, hSummary, hNpc, hHist, hLblNpc, hLblHist;
+HWND hTitle, hStatus, hTimer, hDetLbl, hDetails, hSummary, hHist, hLblHist;
 
 HWND hGenReset, hExpGen;
 
@@ -58,7 +59,7 @@ HWND hLblUpd = nullptr, hUpdChk = nullptr, hUpdInfo = nullptr, hUpdTab = nullptr
 bool gAutoUpdate = true;
 HWND hCmpTimerLoad = nullptr;
 HWND hCmpPause = nullptr, hCmpStop = nullptr;
-HWND hLblKeys = nullptr, hKeyLbl[3] = {}, hKeyBtn[3] = {};
+HWND hLblKeys = nullptr, hKeyLbl[3] = {}, hKeyBtn[3] = {}, hKeysChk = nullptr;
 HWND hTabExp, hExpName, hExpLevel, hExpArea, hExpInfo, hExpRowLbl, hExpOvChk, hExpHint;
 
 HANDLE gMutex = nullptr;
@@ -85,12 +86,7 @@ std::string gPartial;
 
 bool gHistDirty = true, gFileOk = false;
 
-size_t gNpcShown = (size_t)-1;
-
-int gNpcRunId = -1;
-
-
-std::vector<std::string> gActs;   // act sub-tabs on the Campaign page
+std::vector<std::string> gActs;  // act sub-tabs on the Campaign page
 
 std::vector<HWND> gActBtns;
 
@@ -100,7 +96,7 @@ std::vector<int> gCmpRows;        // list row -> zone index
 
 int gLastCurZone = -2;
 
-int gHistCurRow = -1;  // General list: row of the map being played
+int gHistCurRow = -1;  // Maps list: row of the map being played
 
 int gActRowX = 0, gActRowY = 0;
 

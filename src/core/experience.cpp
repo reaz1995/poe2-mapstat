@@ -60,4 +60,11 @@ int bestArea(int charLevel) {
     return best;
 }
 
+std::string bestAreaText(int charLevel) {
+    int lo = bestArea(charLevel), hi = lo;
+    double top = expectedExp(charLevel, lo);
+    while (hi < 99 && expectedExp(charLevel, hi + 1) >= top * (1 - 1e-9)) ++hi;
+    return hi > lo ? std::to_string(lo) + "-" + std::to_string(hi) : std::to_string(lo);
+}
+
 }  // namespace xp

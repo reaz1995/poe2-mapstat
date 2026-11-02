@@ -77,10 +77,9 @@ public:
     std::vector<Run> history;       // finished runs, oldest first
     bool hasCurrent = false;
     Run cur;
-    std::vector<std::string> npcLines;  // dialogue heard during current run
-    std::string location;           // areaId the player is in now
-    std::string locationName;       // display name from the loading screen
-    std::string sessionStart;       // first timestamp of the log
+    std::string location;  // areaId the player is in now
+    std::string locationName;  // display name from the loading screen
+    std::string sessionStart;  // first timestamp of the log
     uint32_t lastTick = 0;
     std::string homeId, homeName;   // last hideout seen (the map's starting point)
     bool inHideoutNow = false;      // standing in a hideout right now (any hideout)
@@ -94,6 +93,12 @@ public:
 
     // Campaign zones
     std::map<std::string, std::string> areaNames;  // areaId -> display name (learned from [SCENE] lines)
+    // Campaign areas: lowest and highest area level seen. Some zones (Act 4, Interludes) follow the character
+    // level within a range, so they are generated at different levels; this keeps the range seen so far.
+    std::map<std::string, std::pair<int, int>> areaLevels;
+    void noteAreaLevel(const std::string& areaId, int level);
+    // "46-51" for a zone that follows the character level (built-in list, else the range seen), "" for fixed ones
+    std::string levelRange(const std::string& areaId) const;
     bool areaNamesChanged = false;
     bool loadAreaNames(const std::string& path);
     bool saveAreaNames(const std::string& path) const;
@@ -119,12 +124,12 @@ public:
     void toggleCampaignPause(uint32_t tick);
     void stopCampaign(uint32_t tick);
 
-    // "Reset Session" on the General tab: hides older finished maps there (Summary keeps all).
-    size_t generalStart = 0;         // first history index shown on the General tab
+    // "Reset Session" on the Maps tab: hides older finished maps there (Summary keeps all).
+    size_t generalStart = 0;  // first history index shown on the Maps tab
     void resetGeneral();
 
-    // Summary is independent of the General list: it counts history[summaryStart..], the open map and
-    // summaryArchive (runs of General lists that were replaced by a restore or an import). Only
+    // Summary is independent of the Maps list: it counts history[summaryStart..], the open map and
+    // summaryArchive (runs of Maps lists that were replaced by a restore or an import). Only
     // "Reset Summary" clears it; the map open at that moment is left out (summarySkipId).
     size_t summaryStart = 0;
     int summarySkipId = -1;
@@ -135,7 +140,7 @@ public:
     static bool isCampaign(const std::string& area);   // G1_2, G1_town, C_G2_3, P1_1 ...
     static std::string actOf(const std::string& area);  // "Act 1", "Act 2 (Cruel)", ...
 
-    // Restore map session / Load past events: the General list comes from `src`. Runs counted in Summary
+    // Restore map session / Load past events: the Maps list comes from `src`. Runs counted in Summary
     // so far move to summaryArchive, the new runs are added to Summary. Campaign and the live state stay.
     void replaceMaps(const Tracker& src);
     void reset();                   // clears all data
@@ -146,7 +151,7 @@ public:
     // counts for that map, zone or hideout stay. Longer breaks are not counted.
     static constexpr uint32_t kOfflineKeepMs = 15 * 60 * 1000;
 
-    // Persistence. Maps (General) and campaign zones are stored in separate files
+    // Persistence. Maps and campaign zones are stored in separate files
     // (MapSession / CampaignSession), so each part can be reset and restored on its own. Summary state
     // has a file of its own (SummarySession).
     enum Parts { kMaps = 1, kCampaign = 2, kSummary = 4, kAll = 7 };
@@ -183,7 +188,6 @@ private:
     void startRun(const std::string& area, int level, uint32_t seed, const LogLine& l);
     void onGenerate(const std::string& area, int level, uint32_t seed, const LogLine& l);
     void onLoaded(const std::string& name, double sec, const LogLine& l);
-    void onDialogue(const std::string& speaker, const std::string& text, const LogLine& l);
     void onDisconnect(const LogLine& l);
 };
 

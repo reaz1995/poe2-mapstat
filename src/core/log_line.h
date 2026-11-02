@@ -7,7 +7,7 @@ struct LogLine {
     std::string date;   // 2026/11/01
     std::string time;   // 21:13:15
     uint32_t tick = 0;  // ms counter (GetTickCount of the PoE machine)
-    std::string hash;   // e.g. 3ef23348 = NPC dialogue
+    std::string hash;  // message type id of the line
     std::string level;  // INFO / DEBUG / WARN / CRIT
     std::string msg;
 };

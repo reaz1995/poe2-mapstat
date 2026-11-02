@@ -87,7 +87,8 @@ void refreshCampaign(bool force) {
         setTextIfChanged(hCmpTitle, L"Campaign run stopped");
         setTextIfChanged(hCmpTimer, W(fmtDuration(total)));
         setTextIfChanged(hCmpTimerLoad, L"");
-        setTextIfChanged(hCmpStatus, L"Press " + hotkeyName(HK_START) + L" or Start to begin a new run");
+        setTextIfChanged(hCmpStatus, gHotkeysOn ? L"Press " + hotkeyName(HK_START) + L" or Start to begin a new run"
+                                                : std::wstring(L"Press Start to begin a new run"));
     } else {
         setTextIfChanged(hCmpTimerLoad, L"");
         setTextIfChanged(hCmpTitle, L"Not in a campaign zone");
@@ -100,7 +101,6 @@ void refreshCampaign(bool force) {
     // entering a zone (or a new act) switches to that act's tab, unless the whole campaign is shown
     if (g.curZone != gLastCurZone) {
         gLastCurZone = g.curZone;
-
         if (g.curZone >= 0 && gSelAct != kAllActs) selectAct(Tracker::actOf(g.zones[g.curZone].areaId));
     }
 

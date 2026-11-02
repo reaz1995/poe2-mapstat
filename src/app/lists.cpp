@@ -9,8 +9,8 @@ static LRESULT CALLBACK SearchEditProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, U
 static void placeSearchBox(HWND lv, HWND hd, HDC dc);
 static LRESULT CALLBACK ListProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR);
 
-// search box in the header of the name column (General, Summary, Campaign): filters rows by name or Area ID
-static std::map<HWND, HWND> gSearchEdit;        // list -> edit
+// search box in the header of the name column (Maps, Summary, Campaign): filters rows by name or Area ID
+static std::map<HWND, HWND> gSearchEdit;  // list -> edit
 
 static std::map<HWND, std::wstring> gSearch;    // list -> lower-case text
 
@@ -303,7 +303,7 @@ void showColumnMenu(HWND lv, int col) {
         Header_GetItem(ListView_GetHeader(lv), col, &hi);
     }
     SortState st = gSort[lv];
-    bool filterMenu = lv == hHist && col == 1;  // Map column on General: category filter
+    bool filterMenu = lv == hHist && col == 1;  // Map column on Maps: category filter
     gMenuItems.clear();
     gMenuItems.reserve(16);  // item data pointers must stay valid while the menu is open
     if (filterMenu) {

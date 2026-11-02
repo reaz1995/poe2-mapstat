@@ -11,7 +11,6 @@ static void resetReader() {  // log reading state + UI caches; stored runs/zones
     gCmpShownAct = "\x01";
     gLastCurZone = -2;
     gHistDirty = true;
-    gNpcShown = (size_t)-1;
 }
 
 // After the start-up replay the current area was entered some time ago. Up to 15 minutes that time counts
@@ -140,6 +139,7 @@ void fullReload() {
     gSkipExisting = true;
     gHistoryLoaded = false;
     g.loadAreaNames(areasPath());
+    for (auto& z : g.zones) g.noteAreaLevel(z.areaId, z.level);  // ranges also from runs stored before
     g.resetSession();
     resetReader();
     gHead.clear();

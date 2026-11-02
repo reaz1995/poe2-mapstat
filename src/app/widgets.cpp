@@ -63,8 +63,11 @@ void drawButton(const DRAWITEMSTRUCT* d) {
 
     if (kind == Btn::Tab || kind == Btn::Gear) {
         FillRect(dc, &r, brDarkest);
-        int page = d->hwndItem == hTabGen ? PG_GENERAL : d->hwndItem == hTabSum ? PG_SUMMARY
-                 : d->hwndItem == hTabCmp ? PG_CAMPAIGN : d->hwndItem == hTabExp ? PG_EXPERIENCE : d->hwndItem == hGear ? PG_OPTIONS : -1;
+        int page = d->hwndItem == hTabGen   ? (gPage == PG_SUMMARY ? PG_SUMMARY : PG_GENERAL)
+                   : d->hwndItem == hTabCmp ? PG_CAMPAIGN
+                   : d->hwndItem == hTabExp ? PG_EXPERIENCE
+                   : d->hwndItem == hGear   ? PG_OPTIONS
+                                            : -1;
         bool active = page >= 0 && gPage == page;
         COLORREF col = active ? C::Fg : hover ? C::Purple : C::Comment;
         if (kind == Btn::Gear) {
@@ -85,8 +88,9 @@ void drawButton(const DRAWITEMSTRUCT* d) {
 
     FillRect(dc, &r, brBg);
     if (kind == Btn::Pill) {
-        bool sel = W(gSelAct) == text;
-        bool here = g.curZone >= 0 && W(Tracker::actOf(g.zones[g.curZone].areaId)) == text;
+        bool sub = d->hwndItem == hSubSession || d->hwndItem == hSubSummary;  // Maps sub-tabs, else act pills
+        bool sel = sub ? gPage == (d->hwndItem == hSubSession ? PG_GENERAL : PG_SUMMARY) : W(gSelAct) == text;
+        bool here = !sub && g.curZone >= 0 && W(Tracker::actOf(g.zones[g.curZone].areaId)) == text;
         fillRound(dc, r, 16, sel ? C::Purple : C::Card, sel ? C::Purple : hover ? C::Purple : C::Line);
         SelectObject(dc, fBold);
         SetTextColor(dc, sel ? C::Darkest : here ? C::Green : C::Fg);
@@ -96,8 +100,13 @@ void drawButton(const DRAWITEMSTRUCT* d) {
     if (kind == Btn::Check) {
         RECT box = {r.left, r.top + (r.bottom - r.top - 18) / 2, r.left + 18, 0};
         box.bottom = box.top + 18;
-        bool on = d->hwndItem == hOverlayChk ? gOverlayOn : d->hwndItem == hCloseChk ? gStartInTray : d->hwndItem == hUpdChk ? gAutoUpdate
-                : d->hwndItem == hCmdChk ? gCmdOn : d->hwndItem == hExpOvChk ? gExpOnOverlay : gOnTopOn;
+        bool on = d->hwndItem == hOverlayChk ? gOverlayOn
+                  : d->hwndItem == hCloseChk ? gStartInTray
+                  : d->hwndItem == hUpdChk   ? gAutoUpdate
+                  : d->hwndItem == hCmdChk   ? gCmdOn
+                  : d->hwndItem == hExpOvChk ? gExpOnOverlay
+                  : d->hwndItem == hKeysChk  ? gHotkeysOn
+                                             : gOnTopOn;
         fillRound(dc, box, 6, on ? C::Purple : C::Card, on ? C::Purple : (hover ? C::Purple : C::Comment));
         if (on) {
             HPEN pen = CreatePen(PS_SOLID, 2, C::Darkest);
@@ -222,7 +231,7 @@ COLORREF staticColor(HWND c) {
         if (g.cmpClock == Tracker::Clock::Paused) return C::Yellow;
         return g.curZone >= 0 ? C::Purple : C::Comment;
     }
-    if (c == hCmpTimerLoad) return C::Comment;
+    if (c == hCmpTimerLoad || c == hExpHint) return C::Comment;
     if (c == hStatus) {
         if (!g.hasCurrent) return C::Comment;
         if (g.cur.state == RunState::Active) return C::Green;
@@ -230,7 +239,9 @@ COLORREF staticColor(HWND c) {
         return C::Cyan;
     }
     if (c == hCmpStatus) return g.curZone >= 0 ? C::Green : C::Comment;
-    if (c == hLblNpc || c == hLblHist || c == hLblSum || c == hLblCmp || c == hLblPath || c == hLblOverlay || c == hLblTheme || c == hLblUpd) return C::Pink;
+    if (c == hLblHist || c == hLblSum || c == hLblCmp || c == hLblPath || c == hLblOverlay || c == hLblTheme ||
+        c == hLblUpd || c == hLblKeys)
+        return C::Pink;
     if (c == hDetLbl || c == hOptLbl || c == hUpdInfo) return C::Comment;
     if (c == hRecVal) return C::Purple;
     if (c == hSumHdr || c == hSummary || c == hCmpSum) return C::Cyan;

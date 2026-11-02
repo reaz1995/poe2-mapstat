@@ -101,7 +101,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_CTLCOLORLISTBOX: {
             HDC dc = (HDC)wp;
             SetBkColor(dc, C::Card);
-            SetTextColor(dc, (HWND)lp == hNpc ? C::Yellow : C::Fg);
+            SetTextColor(dc, C::Fg);
             return (LRESULT)brCard;
         }
         case WM_HOTKEY_ACT:
@@ -116,12 +116,27 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 return 0;
             }
             switch (LOWORD(wp)) {
-                case ID_TAB_GEN: showPage(PG_GENERAL); break;
-                case ID_TAB_SUM: showPage(PG_SUMMARY); break;
-                case ID_TAB_CMP: showPage(PG_CAMPAIGN); break;
-                case ID_TAB_EXP: showPage(PG_EXPERIENCE); break;
-                case ID_EXP_OVCHK: toggleExpOverlay(); break;
-                case ID_GEAR: showPage(PG_OPTIONS); break;
+                case ID_TAB_GEN:
+                    showMapsPage();
+                    break;
+                case ID_TAB_SES:
+                    showPage(PG_GENERAL);
+                    break;
+                case ID_TAB_SUM:
+                    showPage(PG_SUMMARY);
+                    break;
+                case ID_TAB_CMP:
+                    showPage(PG_CAMPAIGN);
+                    break;
+                case ID_TAB_EXP:
+                    showPage(PG_EXPERIENCE);
+                    break;
+                case ID_EXP_OVCHK:
+                    toggleExpOverlay();
+                    break;
+                case ID_GEAR:
+                    showPage(PG_OPTIONS);
+                    break;
                 default:
                     if (LOWORD(wp) >= ID_ACT_FIRST && LOWORD(wp) < ID_ACT_FIRST + (int)gActs.size()) {
                         selectAct(gActs[LOWORD(wp) - ID_ACT_FIRST]);
@@ -176,7 +191,12 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 case ID_CMP_PAUSE: campaignAction(HK_PAUSE); break;
                 case ID_KEY_BTN0:
                 case ID_KEY_BTN1:
-                case ID_KEY_BTN2: beginKeyCapture(LOWORD(wp) - ID_KEY_BTN0); break;
+                case ID_KEY_BTN2:
+                    beginKeyCapture(LOWORD(wp) - ID_KEY_BTN0);
+                    break;
+                case ID_KEYS_CHK:
+                    toggleHotkeys();
+                    break;
                 case ID_ONTOP:
                     setOnTop(!gOnTopOn);
                     WritePrivateProfileStringW(L"main", L"OnTop", gOnTopOn ? L"1" : L"0", iniPath().c_str());
