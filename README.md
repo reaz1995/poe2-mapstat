@@ -175,10 +175,12 @@ Timer colours: purple = running, cyan = loading, orange = paused / hideout. Camp
 
 - `LatestClient.txt` path - found automatically on start (running game, Steam libraries, standalone install),
   otherwise you are asked to pick it.
-- Always on top, start hidden in tray, overlays on/off, number of overlay records. Defaults: not on top, start hidden
-  in tray, MapTimerOverlay on with 4 records, CommandBarOverlay off, hotkeys off, check for updates on start.
+- Always on top, start hidden in tray, overlays on/off, number of overlay records, overlay **Transparency** (0-100%
+  in 10% steps, both overlays). Defaults: not on top, start hidden
+  in tray, MapTimerOverlay on with 4 records, CommandBarOverlay off, transparency 10%, hotkeys off,
+  check for updates on start.
 - **Hotkeys** for the campaign timer: *Enable hotkeys* turns them on or off; click a key, press the new one (Esc cancels, Delete removes it).
-- **Theme** - built-in themes (Light, Nord) with *Default (Dracula)* at the bottom.
+- **Theme** - built-in themes (Dark Cyan, Light, Nord) with *Default (Dracula)* at the bottom.
 - **Updates** (Release builds) - check on start; the **Check for updates** button next to ⚙ updates and restarts.
 
 ## Install
