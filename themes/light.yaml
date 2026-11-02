@@ -1,0 +1,23 @@
+# Poe2 | MapStat theme - Light
+name: Light
+mode: light
+
+colors:
+  background: "#f5f6f8"
+  card:       "#ffffff"
+  darkest:    "#e6e8ec"
+  line:       "#c9ced6"
+  stripe:     "#f3f4f7"
+  foreground: "#1f2328"
+  comment:    "#6e7781"
+  purple:     "#6639ba"
+  cyan:       "#0969da"
+  green:      "#1a7f37"
+  orange:     "#bc4c00"
+  pink:       "#bf3989"
+  red:        "#cf222e"
+  yellow:     "#9a6700"
+
+fonts:
+  ui:   "Segoe UI"
+  mono: "Consolas"

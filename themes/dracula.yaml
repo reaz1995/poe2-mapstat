@@ -1,0 +1,30 @@
+# Poe2 | MapStat theme - Dracula (built-in default)
+# Themes are built into the exe: add or edit a .yaml in themes/, rebuild, pick it in Options -> THEME.
+# Colours: "#rrggbb" or "#rgb". Missing keys keep the Dracula value.
+
+name: Dracula
+author: Poe2 | MapStat
+mode: dark            # dark | light - title bar and scrollbars
+
+colors:
+  # surfaces
+  background: "#282a36"   # window background
+  card:       "#21222c"   # panels, lists, buttons
+  darkest:    "#191a21"   # tab bar, list header, overlays, text on accent
+  line:       "#44475a"   # borders, hover, selected row
+  stripe:     "#252632"   # alternate list rows
+  # text
+  foreground: "#f8f8f2"   # normal text
+  comment:    "#6272a4"   # muted text, hints, old overlay records
+  # accents
+  purple:     "#bd93f9"   # main accent: selected tab, checkboxes, focus
+  cyan:       "#8be9fd"   # totals line, timers, Hideout button
+  green:      "#50fa7b"   # running / active
+  orange:     "#ffb86c"   # paused, Exit button
+  pink:       "#ff79c6"   # section titles, area level, sorted column
+  red:        "#ff5555"   # danger buttons, errors
+  yellow:     "#f1fa8c"   # highlights
+
+fonts:
+  ui:   "Segoe UI"        # all text
+  mono: "Consolas"        # big timers
