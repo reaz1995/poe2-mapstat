@@ -1,6 +1,7 @@
 # Poe2 | MapStat
 
 by [Rez](https://github.com/reaz1995)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/reaz1995)
 
 A small Windows companion for **Path of Exile 2** that times your maps and campaign zones and tracks your experience
 by reading the game's log file (`LatestClient.txt`). No game memory reading, no input automation (except the optional
