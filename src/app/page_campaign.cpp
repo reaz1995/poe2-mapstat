@@ -3,9 +3,12 @@
 
 static void syncActTabs();
 
-// Act sub-tabs: one pill per act seen in the zones list, in order of first visit.
+// The first pill shows the whole run: all zones, and the header shows the campaign time instead of the zone time.
+static const char* kAllActs = "Campaign";
+
+// Act sub-tabs: "Campaign" first, then one pill per act seen in the zones list, in order of first visit.
 static void syncActTabs() {
-    std::vector<std::string> acts;
+    std::vector<std::string> acts = {kAllActs};
     for (auto& z : g.zones) {
         std::string a = Tracker::actOf(z.areaId);
         if (std::find(acts.begin(), acts.end(), a) == acts.end()) acts.push_back(a);
@@ -46,17 +49,38 @@ void refreshCampaign(bool force) {
     g.expireZones(now);
     syncClockButtons();
     bool stopped = g.cmpClock == Tracker::Clock::Stopped;
-    if (g.curZone >= 0 && unnamed(g.zones[g.curZone].name, g.zones[g.curZone].areaId)) {
+    syncActTabs();
+    bool all = gSelAct == kAllActs;
+    if (all) {  // whole run: the sum of all zones, so pause / stop / reset apply to it the same way
+        uint64_t ms = 0;
+        double load = 0;
+        for (auto& z : g.zones) {
+            ms += z.activeAt(now);
+            load += z.loadSec;
+        }
+        const char* state = stopped ? "Stopped" : g.cmpClock == Tracker::Clock::Paused ? "Paused" : "Running";
+        std::string where = g.curZone >= 0 ? "  \u00b7  in " + g.zones[g.curZone].name + " (" +
+                                                 Tracker::actOf(g.zones[g.curZone].areaId) + ")"
+                                           : "";
+        setTextIfChanged(hCmpTitle, L"Campaign");
+        setTextIfChanged(hCmpTimer, W(fmtDuration(ms)));
+        setTextIfChanged(hCmpTimerLoad, W(fmtDuration(ms + (uint64_t)(load * 1000.0 + 0.5))) + L" with loading");
+        setTextIfChanged(hCmpStatus,
+                         W(std::string(state) + "  \u00b7  " + std::to_string(g.zones.size()) + " zone runs" + where));
+    } else if (g.curZone >= 0 && unnamed(g.zones[g.curZone].name, g.zones[g.curZone].areaId)) {
         // name not known yet: keep the previous title
     } else if (g.curZone >= 0) {
         const Zone& z = g.zones[g.curZone];
-        const char* state = g.cmpClock == Tracker::Clock::Paused ? "Paused  \u00b7  " : z.inSegment ? "" : "Loading  \u00b7  ";
+        const char* state = g.cmpClock == Tracker::Clock::Paused ? "Paused  \u00b7  "
+                            : z.inSegment                        ? ""
+                                                                 : "Loading  \u00b7  ";
         setTextIfChanged(hCmpTitle, areaName(z.name, z.areaId) + L"  \u00b7  lvl " + std::to_wstring(z.level));
         setTextIfChanged(hCmpTimer, W(fmtDuration(z.activeAt(now))));
-        setTextIfChanged(hCmpTimerLoad, W(fmtDuration(z.activeAt(now) + (uint64_t)(z.loadSec * 1000.0 + 0.5))) + L" with loading");
-        setTextIfChanged(hCmpStatus, W(std::string(state) + Tracker::actOf(z.areaId) +
-                                       "  \u00b7  " + z.areaId + "  \u00b7  seed " + std::to_string(z.seed) +
-                                       "  \u00b7  entries " + std::to_string(z.entries)));
+        setTextIfChanged(hCmpTimerLoad,
+                         W(fmtDuration(z.activeAt(now) + (uint64_t)(z.loadSec * 1000.0 + 0.5))) + L" with loading");
+        setTextIfChanged(hCmpStatus,
+                         W(std::string(state) + Tracker::actOf(z.areaId) + "  \u00b7  " + z.areaId + "  \u00b7  seed " +
+                           std::to_string(z.seed) + "  \u00b7  entries " + std::to_string(z.entries)));
     } else if (stopped) {
         uint64_t total = 0;
         for (auto& z : g.zones) total += z.activeMs;
@@ -73,17 +97,18 @@ void refreshCampaign(bool force) {
     InvalidateRect(hCmpTimer, nullptr, FALSE);
     InvalidateRect(hCmpTimerLoad, nullptr, FALSE);
 
-    syncActTabs();
-    // entering a zone (or a new act) switches to that act's tab
+    // entering a zone (or a new act) switches to that act's tab, unless the whole campaign is shown
     if (g.curZone != gLastCurZone) {
         gLastCurZone = g.curZone;
-        if (g.curZone >= 0) selectAct(Tracker::actOf(g.zones[g.curZone].areaId));
+
+        if (g.curZone >= 0 && gSelAct != kAllActs) selectAct(Tracker::actOf(g.zones[g.curZone].areaId));
     }
 
     // rows of the selected act
     std::vector<int> rows;
     for (size_t i = 0; i < g.zones.size(); ++i)
-        if (Tracker::actOf(g.zones[i].areaId) == gSelAct && !unnamed(g.zones[i].name, g.zones[i].areaId) &&
+        if ((gSelAct == kAllActs || Tracker::actOf(g.zones[i].areaId) == gSelAct) &&
+            !unnamed(g.zones[i].name, g.zones[i].areaId) &&
             searchMatch(hCmpList, areaName(g.zones[i].name, g.zones[i].areaId), W(g.zones[i].areaId)))
             rows.push_back((int)i);
     bool rebuild = force || gCmpShownAct != gSelAct || rows.size() != gCmpRows.size();
@@ -101,9 +126,10 @@ void refreshCampaign(bool force) {
         load += z.loadSec;
         if (first.empty() && !z.firstEnter.empty()) first = z.firstEnter;
         if (!z.lastEnter.empty()) last = z.lastEnter;
-        lv.push_back({{std::to_wstring(r + 1), areaName(z.name, z.areaId) + (z.town ? L"  (town)" : L""), std::to_wstring(z.level),
-                       W(z.areaId), std::to_wstring(z.seed), W(z.firstEnter), W(z.lastEnter), std::to_wstring(z.entries),
-                       W(fmtDuration(ms)), secs(z.loadSec), z.entries ? secs(z.loadSec / z.entries) : L"-"},
+        lv.push_back({{std::to_wstring(r + 1), areaName(z.name, z.areaId) + (z.town ? L"  (town)" : L""),
+                       std::to_wstring(z.level), W(z.areaId), std::to_wstring(z.seed), W(z.firstEnter), W(z.lastEnter),
+                       std::to_wstring(z.entries), W(fmtDuration(ms)), secs(z.loadSec),
+                       z.entries ? secs(z.loadSec / z.entries) : L"-"},
                       rows[r]});
     }
     sortRows(hCmpList, lv);
