@@ -1,0 +1,409 @@
+// MapTimerOverlay: current area + timer, recent records, campaign footer, resizable.
+#include "app.h"
+#include "experience.h"
+
+struct OvLine { std::wstring lvl, name, time; };
+
+static int ovHeight(double sc, int n);
+static void overlayData(OvLine& head, std::vector<OvLine>& last, COLORREF& timeCol);
+static void overlayDataNow(OvLine& head, std::vector<OvLine>& last, COLORREF& timeCol);
+static void paintOverlay(HDC dc, RECT rc);
+static void overlayResized(int w, int h);
+static void ovFitHeight();
+static LRESULT CALLBACK OverlayProc(HWND h, UINT msg, WPARAM wp, LPARAM lp);
+
+double gOvScale = 1.0;
+
+// Always-on-top window: current area with its timer, plus the last N areas (0-10) in grey.
+// Shows the campaign zone while in the campaign, otherwise the current or last map.
+// Everything scales with the window size.
+static const int kOvW = 300, kOvPad = 10, kOvHead = 24, kOvLine = 19, kOvEdge = 7;
+
+int gOvRecords = 3;
+
+// Settings of this overlay live in [MapTimerOverlay]; older versions used [overlay] (read as fallback).
+static const wchar_t* kOvSec = L"MapTimerOverlay";
+
+int ovIniInt(const wchar_t* key, int def) {
+    int old = GetPrivateProfileIntW(L"overlay", key, def, iniPath().c_str());
+    return GetPrivateProfileIntW(kOvSec, key, old, iniPath().c_str());
+}
+
+void ovIniSet(const wchar_t* key, int v) {
+    WritePrivateProfileStringW(kOvSec, key, std::to_wstring(v).c_str(), iniPath().c_str());
+}
+
+// Campaign footer ("Act 1: 01:08" | "Campaign: 07:43") shown while in a campaign zone.
+static const int kOvFoot = 9 + 19;  // separator + one line
+
+static bool gOvFoot = false;
+
+// Two experience lines under the header (Experience tab): "Safe" = the last area level without penalty on the side
+// of the current area and "Diff" = how far the current area is from it; "Best" = the area level with the most
+// experience per monster. Both with the experience compared to a monster of the character's own level.
+static const int kOvExp = 18;
+static bool gOvExp = false;
+
+static int ovHeight(double sc, int n) {
+    return (int)((kOvPad * 2 + kOvHead + (gOvExp ? 2 * kOvExp : 0) + (n ? 9 + n * kOvLine : 0) + (gOvFoot ? kOvFoot : 0)) * sc + 0.5);
+}
+
+static void overlayData(OvLine& head, std::vector<OvLine>& last, COLORREF& timeCol) {
+    static OvLine cHead;
+    static std::vector<OvLine> cLast;
+    static COLORREF cCol = C::Comment;
+    bool waiting = (g.curZone >= 0 && unnamed(g.zones[g.curZone].name, g.zones[g.curZone].areaId)) ||
+                   (g.curZone < 0 && g.hasCurrent && unnamed(g.cur.name, g.cur.areaId));
+    if (!waiting) {
+        overlayDataNow(cHead, cLast, cCol);
+    }
+    head = cHead;
+    last = cLast;
+    timeCol = cCol;
+}
+
+static void overlayDataNow(OvLine& head, std::vector<OvLine>& last, COLORREF& timeCol) {
+    uint32_t now = nowTick();
+    last.clear();
+    timeCol = C::Comment;
+    size_t want = (size_t)gOvRecords;
+    bool stoppedHere = g.curZone < 0 && g.cmpClock == Tracker::Clock::Stopped && Tracker::isCampaign(g.location);
+    if (g.curZone >= 0 || stoppedHere) {  // campaign
+        if (stoppedHere) {  // run finished: the header shows the final campaign time
+            uint64_t total = 0;
+            for (auto& z : g.zones) total += z.activeMs;
+            head = {std::to_wstring(g.locationLevel), W(g.locationName.empty() ? g.location : g.locationName),
+                    W(fmtDuration(total))};
+            timeCol = C::Red;
+        } else {
+            const Zone& z = g.zones[g.curZone];
+            head = {std::to_wstring(z.level), areaName(z.name, z.areaId), W(fmtDuration(z.activeAt(now)))};
+            timeCol = g.cmpClock == Tracker::Clock::Paused ? C::Yellow : z.inSegment ? C::Purple : C::Cyan;
+        }
+        std::vector<int> idx;
+        for (size_t i = 0; i < g.zones.size(); ++i)
+            if ((int)i != g.curZone && g.zones[i].entries > 0) idx.push_back((int)i);
+        std::sort(idx.begin(), idx.end(), [](int a, int b) { return g.zones[a].lastEnter > g.zones[b].lastEnter; });
+        for (size_t i = 0; i < idx.size() && i < want; ++i) {
+            const Zone& p = g.zones[idx[i]];
+            last.push_back({std::to_wstring(p.level), areaName(p.name, p.areaId), W(fmtDuration(p.activeAt(now)))});
+        }
+        return;
+    }
+    if (g.inHideoutNow) {
+        // In a hideout: the hideout is the header (time of this stay), the paused map becomes the first record.
+        head = {std::to_wstring(g.locationLevel), W(g.locationName.empty() ? std::string("Hideout") : g.locationName),
+                W(fmtDuration((uint32_t)(now - g.hideoutStayTick)))};
+        timeCol = C::Orange;
+        if (g.hasCurrent && last.size() < want)
+            last.push_back({std::to_wstring(g.cur.level), areaName(g.cur.name, g.cur.areaId),
+                            W(fmtDuration(g.cur.activeAt(now)))});
+    } else if (g.hasCurrent) {
+        head = {std::to_wstring(g.cur.level), areaName(g.cur.name, g.cur.areaId), W(fmtDuration(g.cur.activeAt(now)))};
+        timeCol = g.cur.state == RunState::Paused ? C::Orange : g.cur.state == RunState::Loading ? C::Cyan : C::Purple;
+    } else {
+        head = {L"", W(g.locationName.empty() ? std::string("No active map") : g.locationName), L"00:00"};
+    }
+    for (size_t i = g.history.size(); i > g.generalStart && last.size() < want; --i) {
+        const Run& p = g.history[i - 1];
+        last.push_back({std::to_wstring(p.level), areaName(p.name, p.areaId), W(fmtDuration(p.activeMs))});
+    }
+}
+
+void ovFonts(double sc) {
+    if (fOvHead) DeleteObject(fOvHead);
+    if (fOvSmall) DeleteObject(fOvSmall);
+    if (fOvTiny) DeleteObject(fOvTiny);
+    fOvTiny = font((int)(12 * sc + 0.5), FW_SEMIBOLD, gFontUi.c_str());
+    fOvHead = font((int)(18 * sc + 0.5), FW_BOLD, gFontUi.c_str());
+    fOvSmall = font((int)(14 * sc + 0.5), FW_NORMAL, gFontUi.c_str());
+}
+
+static void paintOverlay(HDC dc, RECT rc) {
+    const double S = gOvScale;
+    const int P = (int)(kOvPad * S), HH = (int)(kOvHead * S), LH = (int)(kOvLine * S);
+    FillRect(dc, &rc, brDarkest);
+    HPEN pen = CreatePen(PS_SOLID, 1, C::Line);
+    HGDIOBJ op = SelectObject(dc, pen), ob = SelectObject(dc, GetStockObject(NULL_BRUSH));
+    RoundRect(dc, rc.left, rc.top, rc.right, rc.bottom, 14, 14);
+    SelectObject(dc, op);
+    SelectObject(dc, ob);
+    DeleteObject(pen);
+    SetBkMode(dc, TRANSPARENT);
+
+    OvLine head;
+    std::vector<OvLine> last;
+    COLORREF timeCol;
+    overlayData(head, last, timeCol);
+
+    auto line = [&](const OvLine& l, int y, int h, HFONT f, COLORREF lvlCol, COLORREF nameCol, COLORREF tCol) {
+        SelectObject(dc, f);
+        RECT t = {P, y, rc.right - P, y + h};
+        SetTextColor(dc, tCol);
+        DrawTextW(dc, l.time.c_str(), -1, &t, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+        SIZE ts, ls;
+        GetTextExtentPoint32W(dc, l.time.c_str(), (int)l.time.size(), &ts);
+        GetTextExtentPoint32W(dc, L"00", 2, &ls);
+        RECT lv = {P, y, P + ls.cx + 2, y + h};
+        SetTextColor(dc, lvlCol);
+        DrawTextW(dc, l.lvl.c_str(), -1, &lv, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        RECT n = {P + (l.lvl.empty() ? 0 : ls.cx + (int)(8 * S)), y, rc.right - P - ts.cx - (int)(10 * S), y + h};
+        SetTextColor(dc, nameCol);
+        DrawTextW(dc, l.name.c_str(), -1, &n, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    };
+    line(head, P, HH, fOvHead, C::Pink, C::Fg, timeCol);
+    const int XL = (int)(kOvExp * S), XH = gOvExp ? 2 * XL : 0;
+    if (gOvExp) {
+        // Safe: the last area level without penalty on the side of the current area (below or above the
+        // character). Diff: how far the current area is from it, negative = levels outside the safe range (red).
+        // Best: the area level with the most experience per monster for this character.
+        int area = expArea(), range = xp::safeRange(gExpLevel);
+        bool below = area > 0 && area < gExpLevel;
+        int bound = below ? std::max(1, gExpLevel - range) : gExpLevel + range;
+        int margin = below ? area - bound : bound - area;
+        int best = xp::bestArea(gExpLevel);
+        double mArea = area > 0 ? xp::expectedMultiplier(gExpLevel, area) : 1.0, mBest = xp::expectedMultiplier(gExpLevel, best);
+        std::wstring vArea = expPct(mArea), vBest = expPct(mBest);
+        SelectObject(dc, fOvSmall);
+        SIZE w1, w2;  // both "Exp bonus:" labels start at the same x: right of them room for the wider value
+        GetTextExtentPoint32W(dc, vArea.c_str(), (int)vArea.size(), &w1);
+        GetTextExtentPoint32W(dc, vBest.c_str(), (int)vBest.size(), &w2);
+        const int valueW = std::max(w1.cx, w2.cx);
+        auto expLine = [&](int y, const std::wstring& label, const std::wstring& note, COLORREF noteCol, double m,
+                           const std::wstring& val) {
+            RECT r = {P, y, rc.right - P, y + XL};
+            SetTextColor(dc, C::Green);
+            DrawTextW(dc, label.c_str(), -1, &r, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            if (!note.empty()) {
+                SIZE lw;
+                GetTextExtentPoint32W(dc, label.c_str(), (int)label.size(), &lw);
+                RECT rd = r;
+                rd.left += lw.cx + (int)(10 * S);
+                SetTextColor(dc, C::Comment);
+                DrawTextW(dc, L"Diff:", -1, &rd, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                SIZE dw;
+                GetTextExtentPoint32W(dc, L"Diff: ", 6, &dw);
+                rd.left += dw.cx;
+                SetTextColor(dc, noteCol);
+                DrawTextW(dc, note.c_str(), -1, &rd, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            }
+            SetTextColor(dc, m > 1.0005 ? C::Green : m < 0.9995 ? C::Red : C::Fg);
+            DrawTextW(dc, val.c_str(), -1, &r, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+            RECT rl = r;
+            rl.right -= valueW + (int)(5 * S);
+            SetTextColor(dc, C::Comment);
+            DrawTextW(dc, L"Exp bonus:", -1, &rl, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+        };
+        expLine(P + HH, L"Safe " + std::to_wstring(bound),
+                area > 0 ? (margin > 0 ? L"+" : L"") + std::to_wstring(margin) : L"-",
+                area > 0 && margin < 0 ? C::Red : C::Fg, mArea, vArea);
+        expLine(P + HH + XL, L"Best " + std::to_wstring(best), L"", C::Comment, mBest, vBest);
+    }
+    HBRUSH b;
+    if (gOvRecords > 0) {
+        int y = P + HH + XH + (int)(4 * S);
+        RECT sep = {P, y, rc.right - P, y + 1};
+        b = CreateSolidBrush(C::Line);
+        FillRect(dc, &sep, b);
+        DeleteObject(b);
+        y += (int)(5 * S);
+        for (auto& l : last) {
+            line(l, y, LH, fOvSmall, C::Comment, C::Comment, C::Comment);
+            y += LH;
+        }
+    }
+    if (!gOvFoot) return;
+    // Footer: time of the current act and of the whole campaign run
+    uint32_t now = nowTick();
+    std::string act = Tracker::actOf(g.curZone >= 0 ? g.zones[g.curZone].areaId : g.location);
+    COLORREF clockCol = g.cmpClock == Tracker::Clock::Stopped ? C::Red
+                      : g.cmpClock == Tracker::Clock::Paused  ? C::Yellow
+                      : g.curZone >= 0 && g.zones[g.curZone].inSegment ? C::Purple : C::Cyan;
+    uint64_t actMs = 0, totalMs = 0;
+    for (auto& z : g.zones) {
+        uint64_t ms = z.activeAt(now);
+        totalMs += ms;
+        if (Tracker::actOf(z.areaId) == act) actMs += ms;
+    }
+    int y = P + HH + XH + (gOvRecords > 0 ? (int)(9 * S) + gOvRecords * LH : 0) + (int)(4 * S);  // below the record lines
+    RECT sep2 = {P, y, rc.right - P, y + 1};
+    b = CreateSolidBrush(C::Line);
+    FillRect(dc, &sep2, b);
+    DeleteObject(b);
+    y += (int)(5 * S);
+    // One line: "Act 1: 01:08" on the left, "Campaign: 07:43" on the right
+    SelectObject(dc, fOvSmall);
+    std::wstring lA = (act.empty() ? std::wstring(L"Act") : W(act)) + L":", lB = L"Campaign:";
+    std::wstring tA = W(fmtDuration(actMs)), tB = W(fmtDuration(totalMs));
+    SIZE sp, lb, tb;
+    GetTextExtentPoint32W(dc, L" ", 1, &sp);
+    GetTextExtentPoint32W(dc, lA.c_str(), (int)lA.size(), &lb);
+    SetTextColor(dc, C::Comment);
+    TextOutW(dc, P, y + (LH - lb.cy) / 2, lA.c_str(), (int)lA.size());
+    SetTextColor(dc, clockCol);
+    TextOutW(dc, P + lb.cx + sp.cx, y + (LH - lb.cy) / 2, tA.c_str(), (int)tA.size());
+    GetTextExtentPoint32W(dc, tB.c_str(), (int)tB.size(), &tb);
+    GetTextExtentPoint32W(dc, lB.c_str(), (int)lB.size(), &lb);
+    int xr = rc.right - P - tb.cx;
+    SetTextColor(dc, g.cmpClock == Tracker::Clock::Running ? C::Cyan : clockCol);
+    TextOutW(dc, xr, y + (LH - tb.cy) / 2, tB.c_str(), (int)tB.size());
+    SetTextColor(dc, C::Comment);
+    TextOutW(dc, xr - sp.cx - lb.cx, y + (LH - lb.cy) / 2, lB.c_str(), (int)lB.size());
+}
+
+void saveOverlayPos() {
+    RECT wr;
+    GetWindowRect(hOverlay, &wr);
+    ovIniSet(L"X", wr.left);
+    ovIniSet(L"Y", wr.top);
+    ovIniSet(L"W", wr.right - wr.left);
+    ovIniSet(L"H", wr.bottom - wr.top);
+    anchorSave(hOverlay, kOvSec);
+}
+
+// size changed: scale = what fits both width and height, rounded corners follow the size
+static void overlayResized(int w, int h) {
+    double sc = std::min((double)w / kOvW, (double)h / ovHeight(1.0, gOvRecords));
+    sc = std::clamp(sc, 0.6, 3.0);
+    if (std::abs(sc - gOvScale) > 0.01 || !fOvHead) {
+        gOvScale = sc;
+        ovFonts(sc);
+    }
+    SetWindowRgn(hOverlay, CreateRoundRectRgn(0, 0, w + 1, h + 1, 14, 14), TRUE);
+    InvalidateRect(hOverlay, nullptr, FALSE);
+}
+
+// keep the width, fit the height to the lines shown
+static void ovFitHeight() {
+    if (hOverlay) {
+        RECT wr;
+        GetWindowRect(hOverlay, &wr);
+        double sc = std::clamp((double)(wr.right - wr.left) / kOvW, 0.6, 3.0);
+        SetWindowPos(hOverlay, nullptr, 0, 0, wr.right - wr.left, ovHeight(sc, gOvRecords),
+                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+        saveOverlayPos();
+    }
+}
+
+void setOverlayRecords(int n) {
+    gOvRecords = std::clamp(n, 0, 10);
+    ovIniSet(L"Records", gOvRecords);
+    ovFitHeight();
+}
+
+// Campaign footer: shown whenever the player is in a campaign zone. Experience lines: when turned on.
+void ovSyncFooter() {
+    bool want = g.curZone >= 0 || (g.cmpClock == Tracker::Clock::Stopped && Tracker::isCampaign(g.location));
+    bool exp = gExpOnOverlay && gExpLevel > 0 && !expNoMonsters();
+    if (want == gOvFoot && exp == gOvExp) return;
+    gOvFoot = want;
+    gOvExp = exp;
+    ovFitHeight();
+}
+
+static LRESULT CALLBACK OverlayProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
+    switch (msg) {
+        case WM_NCCALCSIZE:  // no visible frame: the whole window is client area (frame only used for resizing)
+            if (wp) return 0;
+            break;
+        case WM_NCACTIVATE:  // never paint the resize frame on activation, it would flash a wide border
+            return DefWindowProcW(h, msg, wp, -1);
+        case WM_NCHITTEST: {  // edges/corners resize, anywhere else drags
+            POINT pt = {(short)LOWORD(lp), (short)HIWORD(lp)};
+            RECT wr;
+            GetWindowRect(h, &wr);
+            bool L = pt.x < wr.left + kOvEdge, R = pt.x >= wr.right - kOvEdge;
+            bool T = pt.y < wr.top + kOvEdge, B = pt.y >= wr.bottom - kOvEdge;
+            if (T && L) return HTTOPLEFT;
+            if (T && R) return HTTOPRIGHT;
+            if (B && L) return HTBOTTOMLEFT;
+            if (B && R) return HTBOTTOMRIGHT;
+            if (L) return HTLEFT;
+            if (R) return HTRIGHT;
+            if (T) return HTTOP;
+            if (B) return HTBOTTOM;
+            return HTCAPTION;
+        }
+        case WM_GETMINMAXINFO: {
+            MINMAXINFO* mm = (MINMAXINFO*)lp;
+            mm->ptMinTrackSize = {(LONG)(kOvW * 0.6), (LONG)ovHeight(0.6, gOvRecords)};
+            mm->ptMaxTrackSize = {kOvW * 3, ovHeight(3.0, gOvRecords) + 400};
+            return 0;
+        }
+        case WM_SIZE:
+            overlayResized(LOWORD(lp), HIWORD(lp));
+            return 0;
+        case WM_NCLBUTTONDBLCLK:  // double-click: bring up the main window
+        case WM_LBUTTONDBLCLK:
+            showMain();
+            return 0;
+        case WM_NCRBUTTONDOWN:  // no system menu on the drag area
+            return 0;
+        case WM_NCRBUTTONUP:
+        case WM_CONTEXTMENU:
+            overlayMenu(h);
+            return 0;
+        case WM_MEASUREITEM:
+            measureMenu((MEASUREITEMSTRUCT*)lp);
+            return TRUE;
+        case WM_DRAWITEM:
+            drawMenu((DRAWITEMSTRUCT*)lp);
+            return TRUE;
+        case WM_ENTERSIZEMOVE:
+            dragStart(h);
+            return 0;
+        case WM_EXITSIZEMOVE:
+            saveOverlayPos();
+            return 0;
+        case WM_MOVING:
+            snapOverlay(h, (RECT*)lp);
+            return TRUE;
+        case WM_ERASEBKGND:
+        case WM_NCPAINT:
+            return 0;
+        case WM_PAINT: {
+            PAINTSTRUCT ps;
+            HDC dc = BeginPaint(h, &ps);
+            RECT rc;
+            GetClientRect(h, &rc);
+            HDC mem = CreateCompatibleDC(dc);  // double buffer: no flicker every 0.5 s
+            HBITMAP bmp = CreateCompatibleBitmap(dc, rc.right, rc.bottom);
+            HGDIOBJ ob = SelectObject(mem, bmp);
+            paintOverlay(mem, rc);
+            BitBlt(dc, 0, 0, rc.right, rc.bottom, mem, 0, 0, SRCCOPY);
+            SelectObject(mem, ob);
+            DeleteObject(bmp);
+            DeleteDC(mem);
+            EndPaint(h, &ps);
+            return 0;
+        }
+    }
+    return DefWindowProcW(h, msg, wp, lp);
+}
+
+void showOverlay(bool on) {
+    gOverlayOn = on;
+    if (on && !hOverlay) {
+        WNDCLASSEXW wc = {};
+        wc.cbSize = sizeof wc;
+        wc.lpfnWndProc = OverlayProc;
+        wc.hInstance = GetModuleHandleW(nullptr);
+        wc.hCursor = LoadCursor(nullptr, IDC_SIZEALL);
+        wc.lpszClassName = L"Poe2MapStatOverlay";
+        wc.style = CS_DBLCLKS;
+        RegisterClassExW(&wc);
+        int x = ovIniInt(L"X", 40);
+        int y = ovIniInt(L"Y", 40);
+        int w = ovIniInt(L"W", kOvW);
+        int h = ovIniInt(L"H", ovHeight((double)w / kOvW, gOvRecords));
+        hOverlay = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
+                                   wc.lpszClassName, L"MapTimerOverlay", WS_POPUP | WS_THICKFRAME, x, y, w, h,
+                                   nullptr, nullptr, wc.hInstance, nullptr);
+        SetLayeredWindowAttributes(hOverlay, 0, 225, LWA_ALPHA);  // slightly see-through
+        DWMNCRENDERINGPOLICY ncr = DWMNCRP_DISABLED;  // no DWM frame/shadow around the overlay
+        DwmSetWindowAttribute(hOverlay, DWMWA_NCRENDERING_POLICY, &ncr, sizeof ncr);
+        overlayResized(w, h);
+    }
+    updateOverlayVisibility();
+    if (hOverlayChk) InvalidateRect(hOverlayChk, nullptr, FALSE);
+}

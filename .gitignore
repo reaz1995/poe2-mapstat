@@ -1,0 +1,37 @@
+# build output (CMake build dirs, generated themes header, binaries)
+build/
+build-*/
+out/
+*.exe
+*.exe.new
+*.obj
+*.o
+*.res
+compile_commands.json
+
+# machine-specific config: toolchain path, deploy folder, GitHub repo (see .env.example)
+.env
+
+# app data (normally in %APPDATA%\Poe2MapStat - never commit personal play data)
+settings.ini
+areas.txt
+sessions/
+*.tsv
+*.csv
+# files older versions wrote next to the exe
+poe2_maptracker.ini
+data.tsv
+
+# game logs (personal data: character name, chat, IP addresses)
+LatestClient.txt
+Client.txt
+*.log
+
+# editors / tools
+.vscode/
+.idea/
+.cache/
+.clangd
+*.swp
+.DS_Store
+Thumbs.db
