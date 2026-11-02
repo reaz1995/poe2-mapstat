@@ -84,6 +84,10 @@ enum {
     ID_REC_MINUS,
     ID_REC_VAL,
     ID_REC_PLUS,
+    ID_ALPHA_LBL,
+    ID_ALPHA_MINUS,
+    ID_ALPHA_VAL,
+    ID_ALPHA_PLUS,
     ID_CLOSE_CHK,
     ID_EXIT,
     ID_CMDBAR,
@@ -210,6 +214,7 @@ extern bool gOverlayOn;
 extern bool gStartInTray, gExiting;
 extern UINT gTaskbarCreated;  // explorer restarted -> add the tray icon again
 extern HWND hLblOverlay, hRecLbl, hRecMinus, hRecVal, hRecPlus, hCloseChk, hExitBtn;
+extern HWND hAlphaLbl, hAlphaMinus, hAlphaVal, hAlphaPlus;
 extern HWND hCmdChk, hCmdBar;
 extern HWND hLblTheme, hThemeSel;
 extern HWND hLblUpd, hUpdChk, hUpdInfo, hUpdTab;
@@ -258,6 +263,7 @@ extern std::map<HWND, SortState> gSort;
 extern std::vector<MenuItem> gMenuItems;  // owner-draw item data (kept alive while the menu is open)
 extern double gOvScale;
 extern int gOvRecords;
+extern int gOvTransparency;  // overlay transparency in percent (0 = solid, 100 = invisible)
 
 // ---------------------------------------------------------------- util.cpp
 std::wstring W(const std::string& s);
@@ -396,6 +402,8 @@ void ovIniSet(const wchar_t* key, int v);
 void ovFonts(double sc);
 void saveOverlayPos();
 void setOverlayRecords(int n);
+void setOverlayTransparency(int pct);
+BYTE overlayAlpha();
 void ovSyncFooter();
 bool ovCampaignShown();  // the timer overlay shows the campaign (footer visible)
 void showOverlay(bool on);

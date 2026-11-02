@@ -23,6 +23,7 @@ double gOvScale = 1.0;
 static const int kOvW = 300, kOvPad = 10, kOvHead = 24, kOvLine = 19, kOvEdge = 7;
 
 int gOvRecords = 4;
+int gOvTransparency = 10;
 
 // Settings of this overlay live in [MapTimerOverlay]; older versions used [overlay] (read as fallback).
 static const wchar_t* kOvSec = L"MapTimerOverlay";
@@ -355,6 +356,17 @@ void setOverlayRecords(int n) {
     ovFitHeight();
 }
 
+BYTE overlayAlpha() { return (BYTE)std::lround(255 * (100 - gOvTransparency) / 100.0); }
+
+// Applies to both overlays.
+void setOverlayTransparency(int pct) {
+    gOvTransparency = std::clamp(pct, 0, 100);
+    ovIniSet(L"Transparency", gOvTransparency);
+    SetWindowTextW(hAlphaVal, (std::to_wstring(gOvTransparency) + L"%").c_str());
+    if (hOverlay) SetLayeredWindowAttributes(hOverlay, 0, overlayAlpha(), LWA_ALPHA);
+    if (hCmdBar) SetLayeredWindowAttributes(hCmdBar, 0, overlayAlpha(), LWA_ALPHA);
+}
+
 // Campaign footer: shown whenever the player is in a campaign zone. Experience lines: when turned on.
 bool ovCampaignShown() { return gOvFoot; }
 
@@ -465,7 +477,7 @@ void showOverlay(bool on) {
         hOverlay = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
                                    wc.lpszClassName, L"MapTimerOverlay", WS_POPUP | WS_THICKFRAME, x, y, w, h,
                                    nullptr, nullptr, wc.hInstance, nullptr);
-        SetLayeredWindowAttributes(hOverlay, 0, 225, LWA_ALPHA);  // slightly see-through
+        SetLayeredWindowAttributes(hOverlay, 0, overlayAlpha(), LWA_ALPHA);
         DWMNCRENDERINGPOLICY ncr = DWMNCRP_DISABLED;  // no DWM frame/shadow around the overlay
         DwmSetWindowAttribute(hOverlay, DWMWA_NCRENDERING_POLICY, &ncr, sizeof ncr);
         overlayResized(w, h);

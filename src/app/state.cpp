@@ -49,6 +49,7 @@ bool gStartInTray = true, gExiting = false;
 UINT gTaskbarCreated = 0;  // explorer restarted -> add the tray icon again
 
 HWND hLblOverlay, hRecLbl, hRecMinus, hRecVal, hRecPlus, hCloseChk, hExitBtn;
+HWND hAlphaLbl, hAlphaMinus, hAlphaVal, hAlphaPlus;
 
 HWND hCmdChk, hCmdBar = nullptr;
 

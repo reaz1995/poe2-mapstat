@@ -194,7 +194,7 @@ void showCmdBar(bool on) {
         hCmdBar = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
                                   wc.lpszClassName, L"CommandBarOverlay", WS_POPUP, x, y, w, kCbH, nullptr, nullptr,
                                   wc.hInstance, nullptr);
-        SetLayeredWindowAttributes(hCmdBar, 0, 230, LWA_ALPHA);
+        SetLayeredWindowAttributes(hCmdBar, 0, overlayAlpha(), LWA_ALPHA);
         SetWindowRgn(hCmdBar, CreateRoundRectRgn(0, 0, w + 1, kCbH + 1, 12, 12), TRUE);
     }
     updateOverlayVisibility();

@@ -151,6 +151,10 @@ void layout(int w, int h) {
     place(hRecPlus, L + 410, y - 3, 34, rh);
     y += 40;
     place(hCmdChk, L, y, 210, 26);
+    place(hAlphaLbl, L + 220, y + 4, 110, 20);
+    place(hAlphaMinus, L + 334, y - 3, 34, rh);
+    place(hAlphaVal, L + 370, y + 4, 48, 20);
+    place(hAlphaPlus, L + 420, y - 3, 34, rh);
     y += 44;
     place(hLblKeys, L, y, CW, 18);
     y += 26;
@@ -248,6 +252,10 @@ void createControls() {
     hRecVal = label(L"3", ID_REC_VAL, fBold, PG_OPTIONS, false, SS_CENTER);
     hRecPlus = btn(L"+", ID_REC_PLUS, PG_OPTIONS, Btn::Normal);
     hCmdChk = btn(L"CommandBarOverlay", ID_CMDBAR, PG_OPTIONS, Btn::Check);
+    hAlphaLbl = label(L"Transparency", ID_ALPHA_LBL, fNormal, PG_OPTIONS);
+    hAlphaMinus = btn(L"\u2212", ID_ALPHA_MINUS, PG_OPTIONS, Btn::Normal);
+    hAlphaVal = label(L"10%", ID_ALPHA_VAL, fBold, PG_OPTIONS, false, SS_CENTER);
+    hAlphaPlus = btn(L"+", ID_ALPHA_PLUS, PG_OPTIONS, Btn::Normal);
     // Experience
     {
         const wchar_t* t[6] = {L"CHARACTER NAME",      L"LEVEL",
