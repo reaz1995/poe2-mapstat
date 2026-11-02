@@ -1,6 +1,7 @@
 # Poe2 | MapStat
 
 by [Rez](https://github.com/reaz1995)
+
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/reaz1995)
 
 A small Windows companion for **Path of Exile 2** that times your maps and campaign zones and tracks your experience
@@ -17,7 +18,7 @@ moves to the records, orange), back into the same map (the timer continues), the
 | In a map | In the hideout | Campaign |
 |---|---|---|
 | ![Map](docs/ingame-map.png) | ![Hideout](docs/ingame-hideout.png) | ![Campaign](docs/ingame-campaign.png) |
-| the timer runs while you are inside | the map you came from waits in the records | zone timer + act and campaign time in the footer |
+| timer, area level and exp lines, last maps below | the map you came from waits in the records | zone timer, zone level range, act and campaign time in the footer |
 
 ---
 
@@ -32,7 +33,7 @@ moves to the records, orange), back into the same map (the timer continues), the
 - **Logouts and game restarts** - back in the same map, zone or hideout within 15 minutes, the time away counts as if
   you never left (also when pulling back old data). After a longer break it is not counted and a hideout stay starts
   at 0.
-- **Summary per map type** - played, total, average and best time per map; it keeps counting across General resets,
+- **Summary per map type** - played, total, average and best time per map; it keeps counting across Maps tab resets,
   restores and imports until you reset it yourself.
 - **Sub-areas** - Abyssal Depths (with faction: Amanamu / Kurgal / Ulaman), Lightless Void, Dark Domain and
   Expedition boss arenas count towards the map they were opened from *and* get their own row in Summary.
@@ -51,20 +52,22 @@ moves to the records, orange), back into the same map (the timer continues), the
 
 ## The tabs
 
-| General | Summary | Campaign | Experience |
+| Maps: Session | Maps: Summary | Campaign | Experience |
 |---|---|---|---|
-| ![General](docs/general.png) | ![Summary](docs/summary.png) | ![Campaign](docs/campaign.png) | ![Experience](docs/experience.png) |
+| ![Maps](docs/general.png) | ![Summary](docs/summary.png) | ![Campaign](docs/campaign.png) | ![Experience](docs/experience.png) |
 
-**General** - the current map (timer, area level, seed, hideout returns, sub-areas, NPC dialogue) and every map of
+**Maps** has two sub-tabs.
+
+*Session* - the current map (timer, area level, seed, hideout returns, sub-areas) and every map of
 the session with load time, map time and entries. Right-click the *Map* header to filter: All / Maps / Expedition /
 Special.
 
-**Summary** - one row per map type: played, total, average and best time, area level range. Hover the *Area Lvl*
+*Summary* - one row per map type: played, total, average and best time, area level range. Hover the *Area Lvl*
 cell to see the plays per area level. Runs that were generated but never entered are not counted. Summary stands on
-its own: Reset Session, Restore map session and Load past Map session events on General only add maps to it, each map
+its own: Reset Session, Restore map session and Load past Map session events on the Maps tab only add maps to it, each map
 instance once. Only **Reset Summary** clears it.
 
-**Campaign** - one pill per act (selected automatically), one row per zone instance with its time, entries, load time
+**Campaign** - a *Campaign* pill with the whole run (header shows the campaign time and the time with loading screens, the list shows all zones), then one pill per act (selected automatically), one row per zone instance with its time, entries, load time
 and average load per entry. The same zone with the same seed re-entered within 1 h continues its row; towns keep
 adding up. Under the big zone timer a smaller one shows the zone time including its loading screens; all other times
 (lists, totals, overlay) leave loading screens out.
@@ -77,7 +80,7 @@ Campaign timer control (buttons next to the timer, or hotkeys set in Options):
 | Pause / resume | F10 | no time is counted while paused; zones you enter are still listed |
 | Start | F11 | only after Stop: starts a new run from zero (the stopped run stays restorable) |
 
-Hotkeys work while the game or the app is in front, and the key still reaches the game.
+Hotkeys are off by default (*Enable hotkeys* in Options). They work while the game or the app is in front, and the key still reaches the game.
 
 **Experience** - type the character name and level once. The level then follows the log
 (`<name> (<class>) is now level 31`). The tab shows:
@@ -87,9 +90,11 @@ Hotkeys work while the game or the app is in front, and the key still reaches th
 | Exp to next level | experience from the current level to the next one |
 | Safe range | areas within `3 + level / 16` levels give full experience |
 | Monster base exp | Experience base stat for the area level (poe2db monster table); each monster multiplies it by its own factor |
+| Effectiveness | *Tablet effectiveness %* + *Map effectiveness %*: every 2% gives 1% more exp (200% = x2), applied to the monster base exp, e.g. `200% | base exp 100,000 -> 200,000` |
+| Experience gain | *Tablet exp gain %* (increased experience gain), applied to the exp left after the level penalty, e.g. `50% | exp after penalties 30 -> 45` |
 | Penalty multiplier | `((L + 5) / (L + 5 + ED^2.5))^1.5`, ED = levels outside the safe range |
-| Expected exp | monster base exp x penalty, and how that compares to a monster of your own level |
-| Best area | the area level with the most exp per monster for your level (the lowest one on a tie), same format |
+| Expected exp | base exp x effectiveness x penalty x experience gain, and how that compares to a monster of your own level |
+| Best area | the area level with the most exp per monster for your level, or a range like `89-99` when several levels give the same, same format |
 
 The area level follows the current map or zone; type another one to compare.
 
@@ -104,7 +109,7 @@ Everything is saved in `%APPDATA%\Poe2MapStat\sessions\` every 10 seconds and wh
 
 | File | Content | Reset with | Restore with |
 |---|---|---|---|
-| `MapSession <start date>.tsv` | maps of General | **Reset Session** | General → **Restore map session...** |
+| `MapSession <start date>.tsv` | maps of the Maps tab | **Reset Session** | Maps → **Restore map session...** |
 | `CampaignSession <start date>.tsv` | campaign zones | **Reset Campaign Run** / **Start** after Stop | Campaign → **Restore campaign session...** |
 | `SummarySession <start date>.tsv` | what Summary counts | **Reset Summary** | - |
 
@@ -115,7 +120,7 @@ maps are added to Summary.
 
 ## Pulling back old data
 
-General → **Load past Map session events...** rebuilds the General list from the game's logs and adds those maps
+Maps → **Load past Map session events...** rebuilds the Maps list from the game's logs and adds those maps
 to Summary (Campaign is left alone):
 
 | Option | Reads |
@@ -138,22 +143,25 @@ columns left out) as a CSV file that opens in Excel / LibreOffice / Google Sheet
 ## Overlays
 
 **MapTimerOverlay** - `lvl  area  timer` as header plus the last 0-10 areas (Options → *Recent records*). In the
-hideout the hideout is the header and the paused map is the first record. In campaign zones a footer shows the
-current act and the whole campaign, e.g. `Act 1: 12:40` and `Campaign: 1:05:12`.
+hideout the hideout is the header and the paused map is the first record. In a sub-area (Abyssal Depths, Lightless
+Void, ...) the header shows the sub-area with its own timer; back in the map it shows the map time again, which
+includes the time of its sub-areas. In campaign zones a footer shows the
+current act and the whole campaign, e.g. `Act 1: 12:40` and `Campaign: 1:05:12`. Zones whose level follows your character level
+(Act 2 wilds, Act 4 islands, Interludes) show their range in small print after the level, e.g. `53 (47-52)`.
 
 With *Show safe area level and exp bonus* on (Experience tab), two lines appear under the header (not in hideouts and
 campaign towns):
 
 | Line | Meaning |
 |---|---|
-| `Safe 89  Diff: -8` | Safe = the last area level without penalty on the side of the current area (below you when the area is lower than your level, above you when it is higher). Diff = how far the current area is from it: negative (red) = levels outside the safe range, positive = margin left |
-| `Best 89` | the area level with the most exp per monster for your level |
-| `Exp bonus: -78.16%` | on both lines: expected exp per monster compared to a monster of your own level (green = more, red = less) |
+| `Area: 64 (56-64)  Lvl: 60` | the current area level (moved here from the header, red when it is outside the safe range of 3 + level / 16 levels around you, with the level range in small print for zones that follow your level) and your character level |
+| `Best: 67` | the area level with the most exp per monster for your level, or a range when several levels give the same |
+| `Exp: +29.82%` | on both lines: expected exp per monster compared to a monster of your own level (green = more, red = less) |
 
-The example is a level 98 character in an area 81. Drag to move, drag the edges to resize (text scales), double-click
+The example is a level 60 character in an Interlude zone of level 64 (range 56-64). On a wide overlay the captions are longer (`Curr. area:`, `Your lvl:`, `Best area:`, `Exp bonus:`). Drag to move, drag the edges to resize (text scales), double-click
 to open the app, right-click for the menu.
 
-![Timer overlay with the experience lines (level 98 in an area 81)](docs/overlay-exp.png)
+![Timer overlay with the experience lines (level 60 in an area 64)](docs/overlay-exp.png)
 
 **CommandBarOverlay** - *Hideout* and *Exit* buttons that type `/hideout` or `/exit` into the game chat.
 
@@ -167,8 +175,9 @@ Timer colours: purple = running, cyan = loading, orange = paused / hideout. Camp
 
 - `LatestClient.txt` path - found automatically on start (running game, Steam libraries, standalone install),
   otherwise you are asked to pick it.
-- Always on top, start hidden in tray, overlays on/off, number of overlay records.
-- **Hotkeys** for the campaign timer: click a key, press the new one (Esc cancels, Delete removes it).
+- Always on top, start hidden in tray, overlays on/off, number of overlay records. Defaults: not on top, start hidden
+  in tray, MapTimerOverlay on with 4 records, CommandBarOverlay off, hotkeys off, check for updates on start.
+- **Hotkeys** for the campaign timer: *Enable hotkeys* turns them on or off; click a key, press the new one (Esc cancels, Delete removes it).
 - **Theme** - built-in themes (Light, Nord) with *Default (Dracula)* at the bottom.
 - **Updates** (Release builds) - check on start; the **Check for updates** button next to ⚙ updates and restarts.
 
@@ -226,8 +235,8 @@ SHA-256 digest from GitHub), replace themselves and restart. The repository must
 ```
 src/core/      tracker, no Windows dependencies (also built on Linux by tools/replay.cpp)
   log_line          parse one log line
-  tracker           event dispatch: area changes, loading screens, scenes, dialogue, disconnects
-  map_tracker       map runs, segments of play time, hideout returns, General/Summary resets
+  tracker           event dispatch: area changes, loading screens, scenes, level ups, disconnects
+  map_tracker       map runs, segments of play time, hideout returns, Maps/Summary resets
   campaign_tracker  campaign zones, acts, Reset Campaign Run, pause / stop
   experience        experience table, safe range, area and penalty multipliers
   area_names        area id -> display name (learned from the log, kept in areas.txt)
