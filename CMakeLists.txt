@@ -80,7 +80,7 @@ target_include_directories(Poe2MapStat PRIVATE
   ${CMAKE_SOURCE_DIR}/src/app ${CMAKE_SOURCE_DIR}/src/core ${CMAKE_SOURCE_DIR}/src/shared ${CMAKE_BINARY_DIR}/generated)
 target_compile_definitions(Poe2MapStat PRIVATE _WIN32_WINNT=0x0A00 UNICODE _UNICODE)
 target_link_options(Poe2MapStat PRIVATE -fuse-ld=lld -municode -static -static-libstdc++ $<$<CONFIG:Release>:-s>)
-target_link_libraries(Poe2MapStat PRIVATE comctl32 comdlg32 shell32 dwmapi uxtheme winhttp bcrypt)
+target_link_libraries(Poe2MapStat PRIVATE comctl32 comdlg32 shell32 dwmapi uxtheme winhttp bcrypt gdiplus ole32)
 
 # Version + self-update. The GitHub repo is baked in only for Release builds (Debug builds never update).
 target_compile_definitions(Poe2MapStat PRIVATE APP_VERSION="${PROJECT_VERSION}")

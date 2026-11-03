@@ -20,6 +20,19 @@ void trayIcon(DWORD op) {
     if (n.hIcon) DestroyIcon(n.hIcon);
 }
 
+// Short notification from the tray icon (e.g. a layout screenshot was saved).
+void trayBalloon(const std::wstring& title, const std::wstring& text) {
+    NOTIFYICONDATAW n = {};
+    n.cbSize = sizeof n;
+    n.hWnd = hMain;
+    n.uID = 1;
+    n.uFlags = NIF_INFO;
+    n.dwInfoFlags = NIIF_INFO | NIIF_NOSOUND;
+    lstrcpynW(n.szInfoTitle, title.c_str(), ARRAYSIZE(n.szInfoTitle));
+    lstrcpynW(n.szInfo, text.c_str(), ARRAYSIZE(n.szInfo));
+    Shell_NotifyIconW(NIM_MODIFY, &n);
+}
+
 void trayMenu() {
     gMenuItems.clear();
     gMenuItems.reserve(8);

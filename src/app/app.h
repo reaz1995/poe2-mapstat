@@ -104,9 +104,11 @@ enum {
     ID_KEY_LBL0,
     ID_KEY_LBL1,
     ID_KEY_LBL2,
+    ID_KEY_LBL3,
     ID_KEY_BTN0,
     ID_KEY_BTN1,
     ID_KEY_BTN2,
+    ID_KEY_BTN3,
     ID_KEYS_CHK,
     ID_TAB_EXP,
     ID_EXP_NAME,
@@ -120,12 +122,15 @@ enum {
     ID_EXP_ROWLBL,
     ID_EXP_OVCHK,
     ID_EXP_HINT,
+    ID_TAB_LAY,
+    ID_LAY_HINT,
+    ID_LAY_FOLDER,
     ID_ACT_FIRST = 2000,
     ID_TIMER_POLL = 1, ID_TIMER_UPD = 2
 };
 
 // Page indices
-enum { PG_GENERAL = 0, PG_SUMMARY = 1, PG_CAMPAIGN = 2, PG_OPTIONS = 3, PG_EXPERIENCE = 4, PG_COUNT };
+enum { PG_GENERAL = 0, PG_SUMMARY = 1, PG_CAMPAIGN = 2, PG_OPTIONS = 3, PG_EXPERIENCE = 4, PG_LAYOUTS = 5, PG_COUNT };
 
 static const wchar_t* kDefaultLog =
     L"C:\\Program Files (x86)\\Steam\\steamapps\\common\\Path of Exile 2\\logs\\LatestClient.txt";
@@ -196,7 +201,7 @@ extern std::string gThemeKey;  // embedded theme file name ("" = default Dracula
 extern std::wstring gFontUi, gFontMono;
 extern HBRUSH brBg, brCard, brDarkest;
 extern HWND hMain;
-extern HWND hTabGen, hTabCmp, hGear;
+extern HWND hTabGen, hTabCmp, hTabLay, hGear;
 extern HWND hSubSession, hSubSummary;  // Maps tab: Session / Summary sub-tabs
 extern HWND hTitle, hStatus, hTimer, hDetLbl, hDetails, hSummary, hHist, hLblHist;
 extern HWND hGenReset, hExpGen;
@@ -221,7 +226,7 @@ extern HWND hLblUpd, hUpdChk, hUpdInfo, hUpdTab;
 extern bool gAutoUpdate;
 extern HWND hCmpTimerLoad;  // Campaign: zone time including its loading screens
 extern HWND hCmpPause, hCmpStop;
-extern HWND hLblKeys, hKeyLbl[3], hKeyBtn[3], hKeysChk;
+extern HWND hLblKeys, hKeyLbl[4], hKeyBtn[4], hKeysChk;
 extern bool gHotkeysOn;  // Options: hotkeys enabled
 extern HWND hTabExp, hExpName, hExpLevel, hExpArea, hExpTabEff, hExpMapEff, hExpGain, hExpInfo, hExpRowLbl, hExpOvChk,
     hExpHint;
@@ -354,7 +359,7 @@ void hideTip();
 void summaryHover(HWND lv, LPARAM lp);
 
 // ---------------------------------------------------------------- hotkeys.cpp
-enum { HK_STOP, HK_PAUSE, HK_START, HK_COUNT };
+enum { HK_STOP, HK_PAUSE, HK_START, HK_LAYOUT, HK_COUNT };
 void loadHotkeys();
 void installKeyHook();
 void removeKeyHook();
@@ -380,6 +385,14 @@ void toggleExpOverlay();
 void selectAct(const std::string& act);
 void refreshCampaign(bool force);
 void placeActs();
+
+// ---------------------------------------------------------------- page_layouts.cpp
+extern HWND hLayHint, hLayFolder, hGallery;
+void createLayoutsPage();
+void refreshLayouts();  // rescan the folders (page shown, hotkey changed)
+void openLayoutFolder();
+void takeLayoutShot();  // hotkey: Windows snipping, the picture is saved to the current zone
+void layoutClipboardUpdate();
 
 // ---------------------------------------------------------------- layout.cpp
 void showMapsPage();  // Maps tab: the sub-page shown last (Session or Summary)
@@ -427,6 +440,7 @@ void updInstall(UpdResult* r);
 void showMain();
 void trayIcon(DWORD op);
 void trayMenu();
+void trayBalloon(const std::wstring& title, const std::wstring& text);
 
 // ---------------------------------------------------------------- main.cpp
 void tick();

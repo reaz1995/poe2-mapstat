@@ -105,8 +105,15 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             return (LRESULT)brCard;
         }
         case WM_HOTKEY_ACT:
-            campaignAction((int)wp);
+            if ((int)wp == HK_LAYOUT) takeLayoutShot();
+            else campaignAction((int)wp);
             return 0;
+        case WM_CLIPBOARDUPDATE:
+            layoutClipboardUpdate();
+            return 0;
+        case WM_MOUSEWHEEL:  // the wheel reaches the window with focus: pass it to the gallery under the cursor
+            if (gPage == PG_LAYOUTS && hGallery) return SendMessageW(hGallery, msg, wp, lp);
+            break;
         case WM_KEY_CAPTURED:
             keyCaptured((UINT)wp, (int)lp);
             return 0;
@@ -130,6 +137,12 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     break;
                 case ID_TAB_EXP:
                     showPage(PG_EXPERIENCE);
+                    break;
+                case ID_TAB_LAY:
+                    showPage(PG_LAYOUTS);
+                    break;
+                case ID_LAY_FOLDER:
+                    openLayoutFolder();
                     break;
                 case ID_EXP_OVCHK:
                     toggleExpOverlay();
@@ -196,6 +209,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 case ID_KEY_BTN0:
                 case ID_KEY_BTN1:
                 case ID_KEY_BTN2:
+                case ID_KEY_BTN3:
                     beginKeyCapture(LOWORD(wp) - ID_KEY_BTN0);
                     break;
                 case ID_KEYS_CHK:
