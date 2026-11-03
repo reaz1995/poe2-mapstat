@@ -1,6 +1,8 @@
 # Publishes a GitHub release when the version in the VERSION file changes.
 # Push to main with a new version (e.g. 1.0.0 -> 1.1.0): the exe is built and released as tag v1.1.0.
 # Push with the same version: nothing happens. Installed copies pick the new release up with their self-update.
+# Release notes come from CHANGES.md (overwrite it with the changes of each new version); when it is missing or
+# empty, GitHub's generated notes are used. The app shows these notes when it offers the update.
 name: Release
 
 on:
@@ -71,4 +73,4 @@ jobs:
           gh release create "${{ steps.ver.outputs.tag }}" build/Poe2MapStat.exe \
             --title "Poe2 | MapStat ${{ steps.ver.outputs.tag }}" \
             --target "${{ github.sha }}" \
-            --generate-notes
+            $(if [ -s CHANGES.md ]; then echo --notes-file CHANGES.md; else echo --generate-notes; fi)

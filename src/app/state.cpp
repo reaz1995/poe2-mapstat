@@ -15,7 +15,7 @@ HBRUSH brBg, brCard, brDarkest;
 
 HWND hMain;
 
-HWND hTabGen, hTabCmp, hGear;
+HWND hTabGen, hTabCmp, hTabLay, hGear;
 HWND hSubSession, hSubSummary;
 
 HWND hTitle, hStatus, hTimer, hDetLbl, hDetails, hSummary, hHist, hLblHist;
@@ -60,7 +60,7 @@ HWND hLblUpd = nullptr, hUpdChk = nullptr, hUpdInfo = nullptr, hUpdTab = nullptr
 bool gAutoUpdate = true;
 HWND hCmpTimerLoad = nullptr;
 HWND hCmpPause = nullptr, hCmpStop = nullptr;
-HWND hLblKeys = nullptr, hKeyLbl[3] = {}, hKeyBtn[3] = {}, hKeysChk = nullptr;
+HWND hLblKeys = nullptr, hKeyLbl[4] = {}, hKeyBtn[4] = {}, hKeysChk = nullptr;
 HWND hTabExp, hExpName, hExpLevel, hExpArea, hExpTabEff, hExpMapEff, hExpGain, hExpInfo, hExpRowLbl, hExpOvChk,
     hExpHint;
 

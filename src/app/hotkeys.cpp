@@ -1,4 +1,4 @@
-// Hotkeys for the campaign clock (Stop / Pause / Start), set in Options.
+// Hotkeys for the campaign clock (Stop / Pause / Start) and layout screenshots, set in Options.
 // A low-level keyboard hook sees the keys while the game has focus; the keys still reach the game.
 #include "app.h"
 
@@ -14,6 +14,7 @@ HotKey gKeys[HK_COUNT] = {
     {L"CampaignStop", VK_F9, 0},
     {L"CampaignPause", VK_F10, 0},
     {L"CampaignStart", VK_F11, 0},
+    {L"LayoutScreenshot", VK_F8, 0},
 };
 
 HHOOK gHook = nullptr;
@@ -135,6 +136,7 @@ void toggleHotkeys() {
     WritePrivateProfileStringW(L"hotkeys", L"Enabled", gHotkeysOn ? L"1" : L"0", iniPath().c_str());
     InvalidateRect(hKeysChk, nullptr, FALSE);
     refreshCampaign(true);
+    refreshLayouts();
 }
 
 void beginKeyCapture(int i) {
@@ -162,6 +164,7 @@ void keyCaptured(UINT vk, int mods) {
     }
     endCapture();
     refreshCampaign(true);
+    refreshLayouts();
 }
 
 void campaignAction(int i) {

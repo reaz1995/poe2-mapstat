@@ -66,6 +66,7 @@ void drawButton(const DRAWITEMSTRUCT* d) {
         int page = d->hwndItem == hTabGen   ? (gPage == PG_SUMMARY ? PG_SUMMARY : PG_GENERAL)
                    : d->hwndItem == hTabCmp ? PG_CAMPAIGN
                    : d->hwndItem == hTabExp ? PG_EXPERIENCE
+                   : d->hwndItem == hTabLay ? PG_LAYOUTS
                    : d->hwndItem == hGear   ? PG_OPTIONS
                                             : -1;
         bool active = page >= 0 && gPage == page;

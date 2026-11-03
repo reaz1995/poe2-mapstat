@@ -41,6 +41,9 @@ moves to the records, orange), back into the same map (the timer continues), the
   times. The campaign timer can be paused, stopped and restarted with buttons or hotkeys (F9 / F10 / F11 by default).
 - **Experience** - character level (updated from the log on level up), experience to the next level, the level
   penalty for the current area, expected exp per monster and the best area level to level up in.
+- **Layouts** - a gallery of zone and map layout screenshots: press a hotkey in game, select an area with the Windows
+  snipping tool, and the picture is saved to the zone you are in. Pieces of the map overlay are joined into one
+  outline per instance.
 - **Overlays** - a resizable timer overlay (with optional Safe / Best experience lines) and a command bar
   (`/hideout`, `/exit`). They follow the game window, are shown only while the game is open and not minimized, and
   snap to each other, to the game and to the screen edges.
@@ -97,6 +100,24 @@ Hotkeys are off by default (*Enable hotkeys* in Options). They work while the ga
 | Best area | the area level with the most exp per monster for your level, or a range like `89-99` when several levels give the same, same format |
 
 The area level follows the current map or zone; type another one to compare.
+
+**Layouts** - screenshots of zone layouts, to remember where the exit or the boss was. On the left: Act 1-4,
+Interlude 1-3 and Maps, one open at a time, with the zones of that act (zones and maps seen in the log are added).
+Click a zone to see its screenshots as thumbnails, newest first; click one to open it in the Windows photo viewer,
+right-click to show it in its folder or delete it (to the Recycle Bin). *Open folder* opens the folder of the zone.
+
+To take one, press the *Layout screenshot* hotkey (F8 by default, hotkeys must be on) in a zone or map: the Windows
+snipping tool opens, select the area (e.g. the minimap) and it is saved as
+`%APPDATA%\Poe2MapStat\layouts\<act>\<zone>\<date>.png` (maps under `layouts\Maps\<map>`). A tray notification
+confirms it. Without the snipping tool the whole game window is saved.
+
+**Joined outlines.** The map overlay (Tab) rarely fits on one screen, so snip it piece by piece. A snip that shows the
+overlay outline becomes an outline picture: black background, the light-blue outline and the labelled points of
+interest (Checkpoint, Waypoint, exits). Pieces of the same instance (area + seed from the log) are matched where
+their outlines overlap and joined into one picture `<date> seed <seed>.png`; a piece that overlaps nothing yet starts
+its own picture, and when a later piece links two pictures they become one. Keep the same overlay zoom for all
+pieces. The original snips are kept in the zone's `pieces` folder. Snips without an outline (or in an unknown
+instance) are saved as they are.
 
 All lists: drag a column header left / right to change the column order, right-click it to sort (ascending /
 descending / default order) or hide / unhide columns,
@@ -179,7 +200,7 @@ Timer colours: purple = running, cyan = loading, orange = paused / hideout. Camp
   in 10% steps, both overlays). Defaults: not on top, start hidden
   in tray, MapTimerOverlay on with 4 records, CommandBarOverlay off, transparency 10%, hotkeys off,
   check for updates on start.
-- **Hotkeys** for the campaign timer: *Enable hotkeys* turns them on or off; click a key, press the new one (Esc cancels, Delete removes it).
+- **Hotkeys** for the campaign timer and *Layout screenshot*: *Enable hotkeys* turns them on or off; click a key, press the new one (Esc cancels, Delete removes it).
 - **Theme** - built-in themes (Dark Cyan, Light, Nord) with *Default (Dracula)* at the bottom.
 - **Updates** (Release builds) - check on start; the **Check for updates** button next to ⚙ updates and restarts.
 
@@ -222,10 +243,12 @@ g++ -std=c++20 -O2 -Isrc/core tools/replay.cpp src/core/*.cpp -o replay && ./rep
 The version lives in the `VERSION` file (e.g. `1.1.0`); CMake reads it for the app.
 
 1. Change `VERSION` to the new version.
-2. Commit and push to `main`.
+2. Overwrite `CHANGES.md` with what changed in this version (one `- ` line per change).
+3. Commit and push to `main`.
 
 `.github/workflows/release.yml` then builds the Release exe on GitHub (llvm-mingw on Linux, `GITHUB_REPO` set to this
-repository) and publishes the release `v1.1.0` with `Poe2MapStat.exe` attached and notes generated from the commits.
+repository) and publishes the release `v1.1.0` with `Poe2MapStat.exe` attached and `CHANGES.md` as the release notes (the app shows them when it offers the update; without
+`CHANGES.md` GitHub generates notes from the commits).
 A push that doesn't change the version does nothing. It can also be started by hand under *Actions → Release → Run
 workflow*.
 
@@ -235,7 +258,7 @@ SHA-256 digest from GitHub), replace themselves and restart. The repository must
 ## Project structure
 
 ```
-src/core/      tracker, no Windows dependencies (also built on Linux by tools/replay.cpp)
+src/core/      tracker and layout outlines (outline.cpp), no Windows dependencies (also built on Linux by tools/replay.cpp)
   log_line          parse one log line
   tracker           event dispatch: area changes, loading screens, scenes, level ups, disconnects
   map_tracker       map runs, segments of play time, hideout returns, Maps/Summary resets
@@ -249,8 +272,8 @@ src/app/       Windows UI
   main              entry point, window procedure, 0.5 s heartbeat
   log_reader        reading LatestClient.txt, finding it
   sessions          session files, resets, restore
-  page_general / page_summary / page_campaign / page_experience   the four tabs
-  hotkeys           campaign timer hotkeys (low-level keyboard hook)
+  page_general / page_summary / page_campaign / page_experience / page_layouts   the tabs
+  hotkeys           campaign timer and layout screenshot hotkeys (low-level keyboard hook)
   lists / widgets / layout                       list views, owner-drawn controls, page layout
   overlay_timer / overlay_cmdbar / overlay_common
   import            Load past Map session events (+ custom range dialog)
@@ -258,11 +281,12 @@ src/app/       Windows UI
 themes/        built-in themes (baked into the exe)
 cmake/         build helpers
 VERSION        app version; a new version pushed to main is released by .github/workflows/release.yml
+CHANGES.md     release notes of the current version (overwritten for each release)
 ```
 
 ## Data and privacy
 
-`%APPDATA%\Poe2MapStat\` contains `settings.ini`, `areas.txt` and `sessions\`. Nothing leaves your PC; the only network
+`%APPDATA%\Poe2MapStat\` contains `settings.ini`, `areas.txt`, `sessions\` and `layouts\`. Nothing leaves your PC; the only network
 access is the optional update check against the GitHub repository the exe was built for. The game logs contain your
 character name, chat and IP addresses - they are git-ignored and never uploaded.
 

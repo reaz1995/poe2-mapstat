@@ -19,8 +19,9 @@ void showPage(int p) {
         ShowWindow(h, maps ? SW_SHOW : SW_HIDE);
         InvalidateRect(h, nullptr, FALSE);
     }
-    for (HWND h : {hTabGen, hTabCmp, hTabExp, hGear}) InvalidateRect(h, nullptr, FALSE);
+    for (HWND h : {hTabGen, hTabCmp, hTabExp, hTabLay, hGear}) InvalidateRect(h, nullptr, FALSE);
     if (p == PG_EXPERIENCE) refreshExperience();
+    if (p == PG_LAYOUTS) refreshLayouts();
     InvalidateRect(hMain, nullptr, TRUE);
     if (p == PG_SUMMARY) refreshSummary();
     if (p == PG_CAMPAIGN) refreshCampaign(true);
@@ -35,6 +36,7 @@ void layout(int w, int h) {
     place(hTabGen, 8, 0, 100, kTabBarH);
     place(hTabCmp, 108, 0, 116, kTabBarH);
     place(hTabExp, 224, 0, 122, kTabBarH);
+    place(hTabLay, 346, 0, 106, kTabBarH);
     place(hGear, w - kTabBarH - 6, 0, kTabBarH, kTabBarH);
     if (hUpdTab) place(hUpdTab, w - kTabBarH - 6 - 170, 0, 166, kTabBarH);  // just left of the gear
 
@@ -95,6 +97,11 @@ void layout(int w, int h) {
         card(PG_CAMPAIGN, L, cy, CW, B - cy);
         place(hCmpList, L + 6, cy + 6, CW - 12, B - cy - 12);
     }
+
+    // ---- Layouts
+    place(hLayHint, L, T + 6, CW - 160, 20);
+    place(hLayFolder, R - 150, T, 150, rh);
+    place(hGallery, L, T + rh + 12, CW, B - (T + rh + 12));
 
     // ---- Experience
     y = T;
@@ -165,17 +172,13 @@ void layout(int w, int h) {
         place(hKeyBtn[i], L + 140, y, 140, rh);
     }
     y += 14;
-    place(hLblTheme, L, y, CW, 18);
+    place(hLblTheme, L, y, 240, 18);  // theme and updates side by side
+    place(hLblUpd, L + 280, y, CW - 280, 18);
     y += 26;
     place(hThemeSel, L, y, 240, rh);
-    y += rh + 24;
-    if (hLblUpd) {
-        place(hLblUpd, L, y, CW, 18);
-        y += 26;
-        if (hUpdChk) place(hUpdChk, L, y, 260, 26);
-        place(hUpdInfo, hUpdChk ? L + 280 : L, y + 3, hUpdChk ? CW - 280 : CW, 20);
-        y += 44;
-    }
+    if (hUpdChk) place(hUpdChk, L + 280, y + 3, 250, 26);
+    place(hUpdInfo, hUpdChk ? L + 540 : L + 280, y + 6, hUpdChk ? CW - 540 : CW - 280, 20);
+    y += rh + 20;
     card(PG_OPTIONS, L, y, CW, 7 * 20 + 2 * pad);
     place(hOptLbl, L + pad + 4, y + pad, 130, 7 * 20);
     place(hOptInfo, L + pad + 140, y + pad, CW - 2 * pad - 144, 7 * 20);
@@ -195,6 +198,7 @@ void createControls() {
     hSubSummary = btn(L"Summary", ID_TAB_SUM, -1, Btn::Pill);
     hTabCmp = btn(L"Campaign", ID_TAB_CMP, -1, Btn::Tab);
     hTabExp = btn(L"Experience", ID_TAB_EXP, -1, Btn::Tab);
+    hTabLay = btn(L"Layouts", ID_TAB_LAY, -1, Btn::Tab);
     hGear = btn(L"", ID_GEAR, -1, Btn::Gear);
 #ifdef UPDATE_REPO
     hUpdTab = btn(L"Check for updates", ID_UPD_TAB, -1, Btn::Tab);
@@ -285,11 +289,12 @@ void createControls() {
     hExpHint = label(L"Enter your character name and the level updates by itself on every level up.", ID_EXP_HINT,
                      fNormal, PG_EXPERIENCE);
 
-    hLblKeys = label(L"HOTKEYS   \u00b7   campaign timer, work while the game or this app is in front", ID_LBL_KEYS,
-                     fSection, PG_OPTIONS);
+    hLblKeys =
+        label(L"HOTKEYS   \u00b7   campaign timer and layout screenshots, work while the game or this app is in front",
+              ID_LBL_KEYS, fSection, PG_OPTIONS);
     hKeysChk = btn(L"Enable hotkeys", ID_KEYS_CHK, PG_OPTIONS, Btn::Check);
     {
-        const wchar_t* names[HK_COUNT] = {L"Stop", L"Pause / resume", L"Start new run"};
+        const wchar_t* names[HK_COUNT] = {L"Stop", L"Pause / resume", L"Start new run", L"Layout screenshot"};
         for (int i = 0; i < HK_COUNT; ++i) {
             hKeyLbl[i] = label(names[i], ID_KEY_LBL0 + i, fNormal, PG_OPTIONS);
             hKeyBtn[i] = btn(hotkeyName(i).c_str(), ID_KEY_BTN0 + i, PG_OPTIONS, Btn::Normal);
@@ -312,6 +317,7 @@ void createControls() {
     hRestoreCmp = btn(L"Restore campaign session...", ID_RESTORE_CMP, PG_CAMPAIGN, Btn::Normal);
     hOptLbl = label(L"Status\r\nRead\r\nLog session\r\nCurrent area\r\nMap session\r\nCampaign session\r\nSummary session", ID_OPT_LBL, fNormal, PG_OPTIONS, true);
     hOptInfo = label(L"", ID_OPT_INFO, fNormal, PG_OPTIONS, true);
+    createLayoutsPage();
 
     for (HWND lv : {hHist, hSumList, hCmpList}) {
         gHiddenCols[lv] = (unsigned)GetPrivateProfileIntW(L"columns", listKey(lv), 0, iniPath().c_str());

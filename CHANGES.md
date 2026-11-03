@@ -1,0 +1,3 @@
+- New Layouts tab: gallery of zone and map layout screenshots, grouped by Act 1-4, Interlude 1-3 and Maps
+- New hotkey Layout screenshot (F8): opens the Windows snipping tool and saves the picture to the zone you are in
+- Snips of the map overlay become outline pictures; pieces of the same instance are joined where they overlap
