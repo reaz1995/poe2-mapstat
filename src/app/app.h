@@ -125,8 +125,14 @@ enum {
     ID_TAB_LAY,
     ID_LAY_HINT,
     ID_LAY_FOLDER,
+    ID_LAY_CROP,
+    ID_LAY_GRAPH,
+    ID_GRAPH_OV,
+    ID_CLICKTHRU,
     ID_ACT_FIRST = 2000,
-    ID_TIMER_POLL = 1, ID_TIMER_UPD = 2
+    ID_TIMER_POLL = 1,
+    ID_TIMER_UPD = 2,
+    ID_TIMER_CLICK = 3
 };
 
 // Page indices
@@ -146,7 +152,7 @@ enum { CAT_ALL = 0, CAT_MAPS, CAT_EXPEDITION, CAT_SPECIAL };
 static const wchar_t* kCatName[] = {L"All", L"Maps", L"Expedition", L"Special"};
 
 static const UINT WM_IMPORTED = WM_APP + 3;
-static const UINT WM_HOTKEY_ACT = WM_APP + 21, WM_KEY_CAPTURED = WM_APP + 22;
+static const UINT WM_HOTKEY_ACT = WM_APP + 21, WM_KEY_CAPTURED = WM_APP + 22, WM_LAYOUT_DONE = WM_APP + 23;
 
 // Stored data: three kinds of files in %APPDATA%\Poe2MapStat\sessions, named by prefix + start date:
 //   "MapSession <date>.tsv"       maps of the Maps tab
@@ -154,16 +160,22 @@ static const UINT WM_HOTKEY_ACT = WM_APP + 21, WM_KEY_CAPTURED = WM_APP + 22;
 //   "SummarySession <date>.tsv"   what Summary counts
 // A reset keeps the old file (state before the reset) and continues in a new one, so each part can be restored.
 struct SessionFile {
-    const wchar_t* prefix;   // file name prefix
-    const wchar_t* key;      // settings.ini [main] key
-    int parts;               // Tracker::Parts stored in it
+    const wchar_t* prefix;  // file name prefix
+    const wchar_t* key;  // settings.ini [main] key
+    int parts;  // Tracker::Parts stored in it
     std::wstring path;
 };
 
 // ---- sortable list filling. Rows are rebuilt from data every refresh, so sorting is applied here.
-struct LvRow { std::vector<std::wstring> c; int tag; };
+struct LvRow {
+    std::vector<std::wstring> c;
+    int tag;
+};
 
-struct SortState { int col = -1; bool desc = false; };
+struct SortState {
+    int col = -1;
+    bool desc = false;
+};
 
 // Relative column widths; columns are stretched to fill the list width on every resize.
 static const int kHistW[] = {35, 140, 70, 190, 100, 75, 60, 75, 60};
@@ -173,7 +185,10 @@ static const int kSumW[] = {170, 70, 210, 70, 100, 90, 80};
 static const int kCmpW[] = {36, 220, 70, 95, 100, 85, 100, 65, 90, 70, 75};
 
 // ---- column menu: right click on a header or a row -> Hide <column> / Unhide all
-struct MenuItem { std::wstring text; bool separator; };
+struct MenuItem {
+    std::wstring text;
+    bool separator;
+};
 
 static const int kTabBarH = 42;
 
@@ -193,7 +208,11 @@ enum { ID_RG_OK = 3001, ID_RG_CANCEL, ID_RG_BROWSE };
 
 static const UINT WM_UPD_FOUND = WM_APP + 4, WM_UPD_DOWNLOADED = WM_APP + 5;
 
-struct UpdResult { bool ok = false, manual = false; ReleaseInfo rel; std::string data, err; };
+struct UpdResult {
+    bool ok = false, manual = false;
+    ReleaseInfo rel;
+    std::string data, err;
+};
 
 // ---------------------------------------------------------------- shared state (defined in the module that owns it)
 extern Theme gTheme;  // active theme
@@ -226,8 +245,8 @@ extern HWND hLblUpd, hUpdChk, hUpdInfo, hUpdTab;
 extern bool gAutoUpdate;
 extern HWND hCmpTimerLoad;  // Campaign: zone time including its loading screens
 extern HWND hCmpPause, hCmpStop;
-extern HWND hLblKeys, hKeyLbl[4], hKeyBtn[4], hKeysChk;
-extern bool gHotkeysOn;  // Options: hotkeys enabled
+extern HWND hLblKeys, hKeyLbl[4], hKeyBtn[4];
+extern bool gHotkeysOn;  // always on (keys can be unset)
 extern HWND hTabExp, hExpName, hExpLevel, hExpArea, hExpTabEff, hExpMapEff, hExpGain, hExpInfo, hExpRowLbl, hExpOvChk,
     hExpHint;
 extern std::wstring gExpName;
@@ -366,8 +385,8 @@ void removeKeyHook();
 std::wstring hotkeyName(int i);
 void beginKeyCapture(int i);
 void keyCaptured(UINT vk, int mods);
+void hotkeyMenu(int i, LPARAM at);  // right-click on a hotkey button
 void campaignAction(int i);
-void toggleHotkeys();
 
 // ---------------------------------------------------------------- page_experience.cpp
 int expAreaLevel();
@@ -387,12 +406,19 @@ void refreshCampaign(bool force);
 void placeActs();
 
 // ---------------------------------------------------------------- page_layouts.cpp
-extern HWND hLayHint, hLayFolder, hGallery;
+extern HWND hLayHint, hLayFolder, hGallery, hLayCropChk, hLayGraph;
+extern bool gLayoutCrop;  // Options: layout screenshot = selected area (snipping tool), else the whole game window
 void createLayoutsPage();
 void refreshLayouts();  // rescan the folders (page shown, hotkey changed)
+void layoutsWatch();  // from the 0.5 s tick: refresh the tab when its folders change outside the app
 void openLayoutFolder();
+void toggleLayoutCrop();
+void makeLayoutGraph();  // points graph of the selected zone (src/core/outline_graph)
+std::vector<std::wstring> currentZoneGraphs();  // graph pictures of the zone the player is in, newest first
+HBITMAP layoutPicture(const std::wstring& path, int maxW, int maxH, int& w, int& h);  // scaled copy of a picture
 void takeLayoutShot();  // hotkey: Windows snipping, the picture is saved to the current zone
 void layoutClipboardUpdate();
+void layoutDone(LPARAM lp);  // WM_LAYOUT_DONE: a screenshot was saved / joined on the worker thread
 
 // ---------------------------------------------------------------- layout.cpp
 void showMapsPage();  // Maps tab: the sub-page shown last (Session or Summary)
@@ -423,6 +449,27 @@ void showOverlay(bool on);
 
 // ---------------------------------------------------------------- overlay_cmdbar.cpp
 void showCmdBar(bool on);
+
+// ---------------------------------------------------------------- overlay_graph.cpp
+extern HWND hGraphOv, hGraphChk;
+// LayoutOverlay (overlay_layout.cpp): the outline of the current instance after a layout screenshot
+extern HWND hLayoutOv;
+bool layoutOverlayShown();
+void layoutOverlayShow(const std::wstring& outlinePath, uint32_t seed);
+void layoutOverlayHide();
+void layoutOverlayTick();  // from the 0.5 s tick: hides it in another instance
+uint32_t currentSeed();
+bool hideFromCapture(HWND h);  // left out of screenshots (Windows 10 2004+); false where not supported
+bool capturedOnScreen(HWND h);  // an overlay that screenshots would still show
+// Click-through overlays: clicks go to the game below, except while Alt is held (then they can be clicked / moved).
+extern bool gClickThru;
+extern HWND hClickChk;
+void setClickThru(bool on);
+void clickThruPoll();  // every 50 ms
+extern bool gGraphOn;
+void showGraphOverlay(bool on);
+void graphOverlayRefresh();  // the zone or its graphs changed
+void graphOverlayTick();  // 0.5 s heartbeat: follows the zone the player is in
 
 // ---------------------------------------------------------------- import.cpp
 void setImportButton();

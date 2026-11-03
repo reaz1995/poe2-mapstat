@@ -60,9 +60,17 @@ void trayMenu() {
     PostMessageW(hMain, WM_NULL, 0, 0);
     DestroyMenu(m);
     switch (cmd) {
-        case 40: showMain(); break;
-        case 41: SendMessageW(hMain, WM_COMMAND, ID_OVERLAY, 0); break;
-        case 42: SendMessageW(hMain, WM_COMMAND, ID_CMDBAR, 0); break;
-        case 43: SendMessageW(hMain, WM_COMMAND, ID_EXIT, 0); break;
+        case 40:
+            showMain();
+            break;
+        case 41:
+            SendMessageW(hMain, WM_COMMAND, ID_OVERLAY, 0);
+            break;
+        case 42:
+            SendMessageW(hMain, WM_COMMAND, ID_CMDBAR, 0);
+            break;
+        case 43:
+            SendMessageW(hMain, WM_COMMAND, ID_EXIT, 0);
+            break;
     }
 }

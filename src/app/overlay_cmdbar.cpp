@@ -2,7 +2,12 @@
 #include "app.h"
 
 // Small bar with buttons that type a chat command into Path of Exile 2 (one click = one command).
-struct CmdButton { const wchar_t* label; const wchar_t* key; const wchar_t* def; const COLORREF* color; };
+struct CmdButton {
+    const wchar_t* label;
+    const wchar_t* key;
+    const wchar_t* def;
+    const COLORREF* color;
+};
 
 static std::wstring cmdText(int i);
 static void sendChatCommand(const std::wstring& cmd);
@@ -191,10 +196,11 @@ void showCmdBar(bool on) {
         int w = kCbGrip + kCbPad * 2 + kCmdN * kCbBtnW + (kCmdN - 1) * kCbGap;
         int x = GetPrivateProfileIntW(kCbSec, L"X", 40, iniPath().c_str());
         int y = GetPrivateProfileIntW(kCbSec, L"Y", 220, iniPath().c_str());
-        hCmdBar = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
-                                  wc.lpszClassName, L"CommandBarOverlay", WS_POPUP, x, y, w, kCbH, nullptr, nullptr,
-                                  wc.hInstance, nullptr);
+        hCmdBar =
+            CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE, wc.lpszClassName,
+                            L"CommandBarOverlay", WS_POPUP, x, y, w, kCbH, nullptr, nullptr, wc.hInstance, nullptr);
         SetLayeredWindowAttributes(hCmdBar, 0, overlayAlpha(), LWA_ALPHA);
+        hideFromCapture(hCmdBar);
         SetWindowRgn(hCmdBar, CreateRoundRectRgn(0, 0, w + 1, kCbH + 1, 12, 12), TRUE);
     }
     updateOverlayVisibility();

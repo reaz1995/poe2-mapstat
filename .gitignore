@@ -18,6 +18,15 @@ areas.txt
 sessions/
 *.tsv
 *.csv
+# layout screenshots, joined outlines and points graphs (Layouts tab): your own work, kept private.
+# README pictures in docs/ are not affected.
+layouts/
+pieces/
+screenshots/
+/*.png
+/*.jpg
+graph *.png
+*seed *.png
 # files older versions wrote next to the exe
 poe2_maptracker.ini
 data.tsv

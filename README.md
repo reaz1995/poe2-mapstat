@@ -38,12 +38,12 @@ moves to the records, orange), back into the same map (the timer continues), the
 - **Sub-areas** - Abyssal Depths (with faction: Amanamu / Kurgal / Ulaman), Lightless Void, Dark Domain and
   Expedition boss arenas count towards the map they were opened from *and* get their own row in Summary.
 - **Campaign** - every zone instance has its own timer, grouped by act, with act and total campaign time and load
-  times. The campaign timer can be paused, stopped and restarted with buttons or hotkeys (F9 / F10 / F11 by default).
+  times. The campaign timer can be paused, stopped and restarted with buttons or hotkeys (set the keys in Options).
 - **Experience** - character level (updated from the log on level up), experience to the next level, the level
   penalty for the current area, expected exp per monster and the best area level to level up in.
-- **Layouts** - a gallery of zone and map layout screenshots: press a hotkey in game, select an area with the Windows
-  snipping tool, and the picture is saved to the zone you are in. Pieces of the map overlay are joined into one
-  outline per instance.
+- **Layouts** - a gallery of zone and map layout screenshots:
+  press a hotkey in game and the game window (or an area you select) is saved to the zone you are in. Pieces of the
+  map overlay are joined into one outline per instance.
 - **Overlays** - a resizable timer overlay (with optional Safe / Best experience lines) and a command bar
   (`/hideout`, `/exit`). They follow the game window, are shown only while the game is open and not minimized, and
   snap to each other, to the game and to the screen edges.
@@ -79,11 +79,11 @@ Campaign timer control (buttons next to the timer, or hotkeys set in Options):
 
 | Action | Default key | What it does |
 |---|---|---|
-| Stop | F9 | ends the run: all times freeze and no zones are tracked until a new run starts |
-| Pause / resume | F10 | no time is counted while paused; zones you enter are still listed |
-| Start | F11 | only after Stop: starts a new run from zero (the stopped run stays restorable) |
+| Stop | not set | ends the run: all times freeze and no zones are tracked until a new run starts |
+| Pause / resume | not set | no time is counted while paused; zones you enter are still listed |
+| Start | not set | only after Stop: starts a new run from zero (the stopped run stays restorable) |
 
-Hotkeys are off by default (*Enable hotkeys* in Options). They work while the game or the app is in front, and the key still reaches the game.
+No hotkeys are set at first: pick them in Options. They work while the game or the app is in front, and the key still reaches the game.
 
 **Experience** - type the character name and level once. The level then follows the log
 (`<name> (<class>) is now level 31`). The tab shows:
@@ -103,20 +103,27 @@ The area level follows the current map or zone; type another one to compare.
 
 **Layouts** - screenshots of zone layouts, to remember where the exit or the boss was. On the left: Act 1-4,
 Interlude 1-3 and Maps, one open at a time, with the zones of that act (zones and maps seen in the log are added).
-Click a zone to see its screenshots as thumbnails, newest first; click one to open it in the Windows photo viewer,
-right-click to show it in its folder or delete it (to the Recycle Bin). *Open folder* opens the folder of the zone.
+Click a zone to see its screenshots as thumbnails, newest first. Like in Explorer: click selects a picture,
+double-click opens it in the Windows photo viewer, F2 (or double-click on its name) renames it, Enter opens and
+Delete moves it to the Recycle Bin; right-click has the same plus *Show in folder*. Pictures dragged onto the tab
+are copied into the selected zone (or the zone they are dropped on). *Open folder* opens the folder of the zone.
 
-To take one, press the *Layout screenshot* hotkey (F8 by default, hotkeys must be on) in a zone or map: the Windows
-snipping tool opens, select the area (e.g. the minimap) and it is saved as
-`%APPDATA%\Poe2MapStat\layouts\<act>\<zone>\<date>.png` (maps under `layouts\Maps\<map>`). A tray notification
-confirms it. Without the snipping tool the whole game window is saved.
+To take one, press the *Layout screenshot* hotkey (set it in Options) in a zone or map: the whole
+game window is saved as `%APPDATA%\Poe2MapStat\layouts\<act>\<zone>\<date>.png` (maps under
+`layouts\Maps\<map>`), and a tray notification confirms it. The parts that stay in place on screen are left
+out, so they can't make two pieces look alike: the window is cropped (top bar, sides, bottom HUD) and the minimap
+corner, the character in the middle and MapStat's own overlays are blanked. With *Select the area* on (Options, next to the hotkey) the Windows snipping tool opens instead
+and only the selected area is saved.
 
-**Joined outlines.** The map overlay (Tab) rarely fits on one screen, so snip it piece by piece. A snip that shows the
-overlay outline becomes an outline picture: black background, the light-blue outline and the labelled points of
-interest (Checkpoint, Waypoint, exits). Pieces of the same instance (area + seed from the log) are matched where
+**Joined outlines.** The map overlay (Tab) rarely fits on one screen, so take it piece by piece: open the overlay, press the
+hotkey, walk on, press it again. A snip that shows the
+overlay outline becomes an outline picture: black background, the outline (light blue, or white with HDR) and the
+labelled points of interest (Checkpoint, Waypoint, exits) with a ring around their icon (yellow = exit, blue =
+checkpoint / waypoint) so they are easy to find on the whole map. Pieces of the same instance (area + seed from the log) are matched where
 their outlines overlap and joined into one picture `<date> seed <seed>.png`; a piece that overlaps nothing yet starts
 its own picture, and when a later piece links two pictures they become one. Keep the same overlay zoom for all
-pieces. The original snips are kept in the zone's `pieces` folder. Snips without an outline (or in an unknown
+pieces. The original screenshots are kept in the zone's `pieces\<seed>` folder. Joining takes about a second
+and runs in the background. Snips without an outline (or in an unknown
 instance) are saved as they are.
 
 All lists: drag a column header left / right to change the column order, right-click it to sort (ascending /
@@ -184,9 +191,41 @@ to open the app, right-click for the menu.
 
 ![Timer overlay with the experience lines (level 60 in an area 64)](docs/overlay-exp.png)
 
+**Points graph.** *Make graph* (Layouts tab) takes the outlines of the selected zone (one per run) and shows where
+its named points were in each run. Each outline keeps the labels found in its screenshots (`Metadata\<seed>\<outline>.txt` in
+the zone's folder); points are told apart by their label text (the same text = the same point). Labels seen several times in one
+run (Checkpoint) are drawn as small dots. It works in two steps:
+
+1. **Entrances** - named points on the outer edge of the zone (the ways in and out) stay put. The runs are lined up
+   on them (on the pair that makes the runs' maps cover the same ground best); a layout the game turned or
+   mirrored is recognized from its map walls and turned back; each gets a dot, its label and a ring
+   when it is always in the same place.
+2. **Places inside** swap between a few spots from run to run. Their points are grouped into spots (numbered grey
+   rings), each place is a dot in its own colour, and the legend says which spots it was in (e.g.
+   `4/4 runs · spots 1, 3, 4`).
+
+The largest outline is drawn faintly. Saved as `graph <date>.png` in the zone's folder. Outlines made by an older
+version are made again from their screenshots in `pieces\<seed>`. Any picture with "graph" in its name counts as a
+graph. Tip: zoom the map overlay in a bit (the same zoom each run) so labels are sharper.
+
 **CommandBarOverlay** - *Hideout* and *Exit* buttons that type `/hideout` or `/exit` into the game chat.
 
-Both overlays stick to the game window: each keeps its distance to the nearest corner of the game, so they follow
+**GraphOverlay** - the graph of the zone you are in (or a note that it has none). With several graphs, the arrows
+on the left and right page through them; double-click opens the graph in the Windows photo viewer. On its first
+start it is placed under the MapTimerOverlay.
+
+**LayoutOverlay** - appears when you take a layout screenshot and shows the outline of the instance you are in as
+it stands after that screenshot; it goes away when you enter another instance (or close it from its menu) and comes
+back with the next screenshot. Double-click opens the outline picture.
+
+All overlays are left out of screenshots (Windows 10 2004 or later): the layout screenshot, the snipping tool and
+other capture tools see the game under them, so they can stay open. On older Windows they are hidden for a moment
+while the app takes its screenshot.
+
+**Click-through** (Options, on by default): clicks go through the overlays to the game below. Hold **Alt** to use
+them (move, resize, click the buttons, right-click menu).
+
+The overlays stick to the game window: each keeps its distance to the nearest corner of the game, so they follow
 when you move the game, resize it or put it on another monitor. While dragging they snap to each other, to the game
 edges and to the screen edges.
 
@@ -197,10 +236,11 @@ Timer colours: purple = running, cyan = loading, orange = paused / hideout. Camp
 - `LatestClient.txt` path - found automatically on start (running game, Steam libraries, standalone install),
   otherwise you are asked to pick it.
 - Always on top, start hidden in tray, overlays on/off, number of overlay records, overlay **Transparency** (0-100%
-  in 10% steps, both overlays). Defaults: not on top, start hidden
-  in tray, MapTimerOverlay on with 4 records, CommandBarOverlay off, transparency 10%, hotkeys off,
+  in 10% steps, all overlays), **Click-through** (hold Alt to use the overlays). Defaults: not on top, start hidden
+  in tray, MapTimerOverlay on with 4 records, CommandBarOverlay off, transparency 10%, click-through on, no hotkeys set,
   check for updates on start.
-- **Hotkeys** for the campaign timer and *Layout screenshot*: *Enable hotkeys* turns them on or off; click a key, press the new one (Esc cancels, Delete removes it).
+- **Hotkeys** for the campaign timer and *Layout screenshot* (whole game window, or *Select the area* with the
+  snipping tool): click a key, press the new one (Esc cancels, Delete or right-click → Remove sets it to Not set).
 - **Theme** - built-in themes (Dark Cyan, Light, Nord) with *Default (Dracula)* at the bottom.
 - **Updates** (Release builds) - check on start; the **Check for updates** button next to ⚙ updates and restarts.
 
@@ -258,7 +298,7 @@ SHA-256 digest from GitHub), replace themselves and restart. The repository must
 ## Project structure
 
 ```
-src/core/      tracker and layout outlines (outline.cpp), no Windows dependencies (also built on Linux by tools/replay.cpp)
+src/core/      tracker, layout outlines and points graph (outline*.cpp), no Windows dependencies (also built on Linux by tools/replay.cpp)
   log_line          parse one log line
   tracker           event dispatch: area changes, loading screens, scenes, level ups, disconnects
   map_tracker       map runs, segments of play time, hideout returns, Maps/Summary resets
@@ -275,7 +315,7 @@ src/app/       Windows UI
   page_general / page_summary / page_campaign / page_experience / page_layouts   the tabs
   hotkeys           campaign timer and layout screenshot hotkeys (low-level keyboard hook)
   lists / widgets / layout                       list views, owner-drawn controls, page layout
-  overlay_timer / overlay_cmdbar / overlay_common
+  overlay_timer / overlay_cmdbar / overlay_graph / overlay_common
   import            Load past Map session events (+ custom range dialog)
   theme_ui, tray, csv_export, update_ui, util, state
 themes/        built-in themes (baked into the exe)

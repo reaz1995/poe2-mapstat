@@ -3,6 +3,7 @@
 // of interest (Checkpoint, Waypoint, zone exits) are taken from each screenshot, and screenshots of the same
 // instance are joined into one picture where their outlines overlap.
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace outline {
@@ -30,15 +31,32 @@ struct Match {
 };
 Match match(const Mask& a, const Mask& b);
 
-const double kMatchScore = 0.8;  // same place above this (measured: 0.90-1.00 for real overlaps, < 0.5 otherwise)
+const double kMatchScore = 0.65;  // same place above this (measured: 0.80-1.00 for real overlaps, < 0.5 otherwise)
+
+// A label on an outline picture (Checkpoint, Waypoint, an exit's or a place's name): its text box and the icon
+// under it, if any (cx < 0: none). Kept next to the picture (saveLabels), as text is hard to find again in it.
+struct Label {
+    int x = 0, y = 0, w = 0, h = 0;
+    int cx = -1, cy = -1;
+    bool exit = false;  // yellow icon (zone exit)
+    std::vector<uint8_t> text;  // w x h: how bright the letters are (0-255) in the screenshot, background 0
+};
+
+struct Outline {
+    Image img;
+    std::vector<Label> labels;
+    bool empty() const { return img.empty(); }
+};
+
+// Labels saved by an older version (found less well): the outline is better made again from its screenshots.
+inline bool oldLabels(const std::string& saved) { return saved.find("outline labels v4") == std::string::npos; }
+std::string saveLabels(const std::vector<Label>& labels);  // text, one label per line
+std::vector<Label> loadLabels(const std::string& text);
 
 // New outline picture from one screenshot: black background, outline and labelled points of interest.
 // Parts of a joined picture that no screenshot showed are (1, 1, 1): they look black but are not compared.
-Image render(const Image& shot);
+Outline render(const Image& shot);
 
-// `base` (an outline picture) extended with `add` placed at (dx, dy). A screenshot (`addIsShot`) gives its
-// outline and points of interest; an outline picture is copied where `base` is still empty.
-Image merge(const Image& base, const Image& add, bool addIsShot, int dx, int dy);
 
 // Adds a screenshot to the outline pictures of one instance. It goes into the first outline it overlaps; other
 // outlines it overlaps are joined into that one too and left empty (their files can go). No overlap: a new
@@ -47,6 +65,9 @@ struct Added {
     int into = -1;
     int overlapped = 0;
 };
-Added add(std::vector<Image>& outlines, const Image& shot);
+Added add(std::vector<Outline>& outlines, const Image& shot);
+// A picture resized by s (0.5 = half as wide and high).
+Image scaled(const Image& im, double s);
+Mask scaledMask(const Mask& m, double s);
 
 }  // namespace outline

@@ -5,9 +5,9 @@ namespace C {
 COLORREF Bg, Card, Darkest, Line, Stripe, Fg, Comment, Cyan, Green, Orange, Pink, Purple, Red, Yellow;
 }  // namespace C
 
-Theme gTheme;              // active theme
+Theme gTheme;  // active theme
 
-std::string gThemeKey;     // embedded theme file name ("" = default Dracula)
+std::string gThemeKey;  // embedded theme file name ("" = default Dracula)
 
 std::wstring gFontUi = L"Segoe UI", gFontMono = L"Consolas";
 
@@ -32,9 +32,9 @@ HFONT fNormal, fBold, fTitle, fTimer, fSection, fTab;
 
 std::vector<HWND> gPages[PG_COUNT];
 
-std::vector<RECT> gCards[PG_COUNT];   // rounded panels painted behind controls
+std::vector<RECT> gCards[PG_COUNT];  // rounded panels painted behind controls
 
-std::vector<HWND> gOnCard;            // statics drawn on a card (card background)
+std::vector<HWND> gOnCard;  // statics drawn on a card (card background)
 
 int gPage = PG_GENERAL;
 
@@ -60,7 +60,7 @@ HWND hLblUpd = nullptr, hUpdChk = nullptr, hUpdInfo = nullptr, hUpdTab = nullptr
 bool gAutoUpdate = true;
 HWND hCmpTimerLoad = nullptr;
 HWND hCmpPause = nullptr, hCmpStop = nullptr;
-HWND hLblKeys = nullptr, hKeyLbl[4] = {}, hKeyBtn[4] = {}, hKeysChk = nullptr;
+HWND hLblKeys = nullptr, hKeyLbl[4] = {}, hKeyBtn[4] = {};
 HWND hTabExp, hExpName, hExpLevel, hExpArea, hExpTabEff, hExpMapEff, hExpGain, hExpInfo, hExpRowLbl, hExpOvChk,
     hExpHint;
 
@@ -94,7 +94,7 @@ std::vector<HWND> gActBtns;
 
 std::string gSelAct, gCmpShownAct;
 
-std::vector<int> gCmpRows;        // list row -> zone index
+std::vector<int> gCmpRows;  // list row -> zone index
 
 int gLastCurZone = -2;
 
@@ -110,7 +110,7 @@ uint64_t gLinesRead = 0;
 
 std::atomic<int> gImportPct{-1};  // -1 = idle (Load past events)
 
-bool gSkipExisting = true;   // track only new log lines (no replay of what is already in the log)
+bool gSkipExisting = true;  // track only new log lines (no replay of what is already in the log)
 
 bool gHistoryLoaded = false;
 

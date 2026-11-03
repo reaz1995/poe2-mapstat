@@ -99,8 +99,9 @@ void layout(int w, int h) {
     }
 
     // ---- Layouts
-    place(hLayHint, L, T + 6, CW - 160, 20);
+    place(hLayHint, L, T + 6, CW - 330, 20);
     place(hLayFolder, R - 150, T, 150, rh);
+    place(hLayGraph, R - 316, T, 158, rh);
     place(hGallery, L, T + rh + 12, CW, B - (T + rh + 12));
 
     // ---- Experience
@@ -152,6 +153,7 @@ void layout(int w, int h) {
     place(hLblOverlay, L, y, CW, 18);
     y += 26;
     place(hOverlayChk, L, y, 200, 26);
+    place(hClickChk, L + 500, y, 340, 26);
     place(hRecLbl, L + 220, y + 4, 110, 20);
     place(hRecMinus, L + 334, y - 3, 34, rh);
     place(hRecVal, L + 372, y + 4, 34, 20);
@@ -162,14 +164,16 @@ void layout(int w, int h) {
     place(hAlphaMinus, L + 334, y - 3, 34, rh);
     place(hAlphaVal, L + 370, y + 4, 48, 20);
     place(hAlphaPlus, L + 420, y - 3, 34, rh);
+    y += 40;
+    place(hGraphChk, L, y, 210, 26);
     y += 44;
     place(hLblKeys, L, y, CW, 18);
     y += 26;
-    place(hKeysChk, L, y, 260, 26);
-    y += 36;
+    y += 4;
     for (int i = 0; i < HK_COUNT; ++i, y += rh + 6) {  // one column: name, key
         place(hKeyLbl[i], L, y + 6, 130, 20);
         place(hKeyBtn[i], L + 140, y, 140, rh);
+        if (i == HK_LAYOUT) place(hLayCropChk, L + 300, y + 3, 460, 26);
     }
     y += 14;
     place(hLblTheme, L, y, 240, 18);  // theme and updates side by side
@@ -214,7 +218,8 @@ void createControls() {
     hExpGen = btn(L"Export to CSV", ID_EXP_GEN, PG_GENERAL, Btn::Accent);
     hSummary = label(L"", ID_SUMMARY, fBold, PG_GENERAL, false, SS_ENDELLIPSIS);
     hLblHist = label(L"MAPS", ID_LBL_HIST, fSection, PG_GENERAL);
-    const wchar_t* hc[] = {L"#", L"Map", L"Area Lvl", L"Area ID", L"Seed", L"Entered", L"Load", L"Map time", L"Entries"};
+    const wchar_t* hc[] = {L"#",       L"Map",  L"Area Lvl", L"Area ID", L"Seed",
+                           L"Entered", L"Load", L"Map time", L"Entries"};
     hHist = list(ID_HIST, PG_GENERAL, hc, kHistW, 9, 0b111110100);
 
     // Summary
@@ -236,8 +241,8 @@ void createControls() {
     hExpCmp = btn(L"Export to CSV", ID_EXP_CMP, PG_CAMPAIGN, Btn::Accent);
     hLblCmp = label(L"ZONES", ID_LBL_CMP, fSection, PG_CAMPAIGN);
     hCmpSum = label(L"", ID_CMP_SUM, fBold, PG_CAMPAIGN, false, SS_ENDELLIPSIS);
-    const wchar_t* cc[] = {L"#", L"Zone", L"Area Lvl", L"Area ID", L"Seed", L"Start", L"Last entered", L"Entries",
-                           L"Total time", L"Load", L"Avg load"};
+    const wchar_t* cc[] = {L"#",       L"Zone",       L"Area Lvl", L"Area ID", L"Seed", L"Start", L"Last entered",
+                           L"Entries", L"Total time", L"Load",     L"Avg load"};
     hCmpList = list(ID_CMP_LIST, PG_CAMPAIGN, cc, kCmpW, 11, 0b11110010100);
     for (HWND lv : {hHist, hSumList, hCmpList}) addSearchBox(lv);
 
@@ -249,17 +254,20 @@ void createControls() {
     hOnTop = btn(L"Always on top", ID_ONTOP, PG_OPTIONS, Btn::Check);
     hCloseChk = btn(L"Start hidden in tray", ID_CLOSE_CHK, PG_OPTIONS, Btn::Check);
     hExitBtn = btn(L"Exit app", ID_EXIT, PG_OPTIONS, Btn::Danger);
-    hLblOverlay = label(L"OVERLAYS   \u00b7   shown only while Path of Exile 2 is open", ID_LBL_OVERLAY, fSection, PG_OPTIONS);
+    hLblOverlay =
+        label(L"OVERLAYS   \u00b7   shown only while Path of Exile 2 is open", ID_LBL_OVERLAY, fSection, PG_OPTIONS);
     hOverlayChk = btn(L"MapTimerOverlay", ID_OVERLAY, PG_OPTIONS, Btn::Check);
     hRecLbl = label(L"Recent records", ID_REC_LBL, fNormal, PG_OPTIONS);
     hRecMinus = btn(L"\u2212", ID_REC_MINUS, PG_OPTIONS, Btn::Normal);
     hRecVal = label(L"3", ID_REC_VAL, fBold, PG_OPTIONS, false, SS_CENTER);
     hRecPlus = btn(L"+", ID_REC_PLUS, PG_OPTIONS, Btn::Normal);
     hCmdChk = btn(L"CommandBarOverlay", ID_CMDBAR, PG_OPTIONS, Btn::Check);
+    hGraphChk = btn(L"GraphOverlay", ID_GRAPH_OV, PG_OPTIONS, Btn::Check);
     hAlphaLbl = label(L"Transparency", ID_ALPHA_LBL, fNormal, PG_OPTIONS);
     hAlphaMinus = btn(L"\u2212", ID_ALPHA_MINUS, PG_OPTIONS, Btn::Normal);
     hAlphaVal = label(L"10%", ID_ALPHA_VAL, fBold, PG_OPTIONS, false, SS_CENTER);
     hAlphaPlus = btn(L"+", ID_ALPHA_PLUS, PG_OPTIONS, Btn::Normal);
+    hClickChk = btn(L"Click-through  (hold Alt to use overlays)", ID_CLICKTHRU, PG_OPTIONS, Btn::Check);
     // Experience
     {
         const wchar_t* t[6] = {L"CHARACTER NAME",      L"LEVEL",
@@ -269,7 +277,8 @@ void createControls() {
         hExpModsLbl = label(L"TABLETS / MAP MODS", ID_EXP_LBLS, fSection, PG_EXPERIENCE);
     }
     hExpName = mk(L"EDIT", gExpName.c_str(), ES_AUTOHSCROLL | WS_TABSTOP, ID_EXP_NAME, fNormal, PG_EXPERIENCE);
-    hExpLevel = mk(L"EDIT", gExpLevel ? std::to_wstring(gExpLevel).c_str() : L"", ES_NUMBER | WS_TABSTOP, ID_EXP_LEVEL, fNormal, PG_EXPERIENCE);
+    hExpLevel = mk(L"EDIT", gExpLevel ? std::to_wstring(gExpLevel).c_str() : L"", ES_NUMBER | WS_TABSTOP, ID_EXP_LEVEL,
+                   fNormal, PG_EXPERIENCE);
     hExpArea = mk(L"EDIT", L"", ES_NUMBER | WS_TABSTOP, ID_EXP_AREA, fNormal, PG_EXPERIENCE);
     auto pctEdit = [](int v, int id) {
         HWND e = mk(L"EDIT", v ? std::to_wstring(v).c_str() : L"", ES_NUMBER | WS_TABSTOP, id, fNormal, PG_EXPERIENCE);
@@ -292,7 +301,8 @@ void createControls() {
     hLblKeys =
         label(L"HOTKEYS   \u00b7   campaign timer and layout screenshots, work while the game or this app is in front",
               ID_LBL_KEYS, fSection, PG_OPTIONS);
-    hKeysChk = btn(L"Enable hotkeys", ID_KEYS_CHK, PG_OPTIONS, Btn::Check);
+    hLayCropChk =
+        btn(L"Select the area (snipping tool) instead of the whole game window", ID_LAY_CROP, PG_OPTIONS, Btn::Check);
     {
         const wchar_t* names[HK_COUNT] = {L"Stop", L"Pause / resume", L"Start new run", L"Layout screenshot"};
         for (int i = 0; i < HK_COUNT; ++i) {
@@ -308,14 +318,18 @@ void createControls() {
     hUpdInfo = label((L"Version v" + W(APP_VERSION) + L"  \u00b7  github.com/" + W(UPDATE_REPO)).c_str(), ID_UPD_INFO,
                      fNormal, PG_OPTIONS);
 #else  // tell why there is nothing to click
-    hUpdInfo = label((L"Version v" + W(APP_VERSION) + L"  \u00b7  self-update is off in this build: set GITHUB_REPO=owner/repo "
-                      L"in .env and build Release").c_str(),
+    hUpdInfo = label((L"Version v" + W(APP_VERSION) +
+                      L"  \u00b7  self-update is off in this build: set GITHUB_REPO=owner/repo "
+                      L"in .env and build Release")
+                         .c_str(),
                      ID_UPD_INFO, fNormal, PG_OPTIONS);
 #endif
     hLoadHist = btn(L"Load past Map session events...", ID_LOAD_HIST, PG_GENERAL, Btn::Accent);
     hRestoreGen = btn(L"Restore map session...", ID_RESTORE_GEN, PG_GENERAL, Btn::Normal);
     hRestoreCmp = btn(L"Restore campaign session...", ID_RESTORE_CMP, PG_CAMPAIGN, Btn::Normal);
-    hOptLbl = label(L"Status\r\nRead\r\nLog session\r\nCurrent area\r\nMap session\r\nCampaign session\r\nSummary session", ID_OPT_LBL, fNormal, PG_OPTIONS, true);
+    hOptLbl =
+        label(L"Status\r\nRead\r\nLog session\r\nCurrent area\r\nMap session\r\nCampaign session\r\nSummary session",
+              ID_OPT_LBL, fNormal, PG_OPTIONS, true);
     hOptInfo = label(L"", ID_OPT_INFO, fNormal, PG_OPTIONS, true);
     createLayoutsPage();
 
