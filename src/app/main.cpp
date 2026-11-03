@@ -11,6 +11,9 @@ void tick() {
     pollLog();
     refreshUi();
     refreshExperience();  // follows level ups and area changes even while another tab is open
+    graphOverlayTick();
+    layoutsWatch();
+    layoutOverlayTick();
     if (hOverlay && gOverlayOn) {
         ovSyncFooter();
         InvalidateRect(hOverlay, nullptr, FALSE);
@@ -37,6 +40,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             installKeyHook();
             updateThemeLabel();
             SetTimer(h, ID_TIMER_POLL, 500, nullptr);
+            SetTimer(h, ID_TIMER_CLICK, 50, nullptr);
             fullReload();
             return 0;
         case WM_SIZE:
@@ -87,6 +91,10 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 return 0;
             }
 #endif
+            if (wp == ID_TIMER_CLICK) {
+                clickThruPoll();
+                return 0;
+            }
             tick();
             return 0;
         case WM_CTLCOLORSTATIC: {
@@ -110,6 +118,9 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             return 0;
         case WM_CLIPBOARDUPDATE:
             layoutClipboardUpdate();
+            return 0;
+        case WM_LAYOUT_DONE:
+            layoutDone(lp);
             return 0;
         case WM_MOUSEWHEEL:  // the wheel reaches the window with focus: pass it to the gallery under the cursor
             if (gPage == PG_LAYOUTS && hGallery) return SendMessageW(hGallery, msg, wp, lp);
@@ -144,6 +155,19 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 case ID_LAY_FOLDER:
                     openLayoutFolder();
                     break;
+                case ID_LAY_CROP:
+                    toggleLayoutCrop();
+                    break;
+                case ID_LAY_GRAPH:
+                    makeLayoutGraph();
+                    break;
+                case ID_CLICKTHRU:
+                    setClickThru(!gClickThru);
+                    break;
+                case ID_GRAPH_OV:
+                    showGraphOverlay(!gGraphOn);
+                    WritePrivateProfileStringW(L"GraphOverlay", L"On", gGraphOn ? L"1" : L"0", iniPath().c_str());
+                    break;
                 case ID_EXP_OVCHK:
                     toggleExpOverlay();
                     break;
@@ -156,18 +180,43 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                         refreshCampaign(false);
                     }
                     break;
-                case ID_BROWSE: browse(); applyPath(); break;
-                case ID_RELOAD: applyPath(); break;
-                case ID_LOAD_HIST: pastEventsMenu(); break;
-                case ID_THEME_SEL: themeMenu(); break;
-                case ID_RESTORE_GEN: restoreSession(gMapFile); break;
-                case ID_RESTORE_CMP: restoreSession(gCmpFile); break;
-                case ID_CMP_RESET: resetCampaignRun(); break;
-                case ID_GEN_RESET: resetGeneralSession(); break;
-                case ID_SUM_RESET: resetSummaryData(); break;
-                case ID_EXP_GEN: exportListView(hHist, exportName(L"maps").c_str()); break;
-                case ID_EXP_SUM: exportListView(hSumList, exportName(L"summary").c_str()); break;
-                case ID_EXP_CMP: exportListView(hCmpList, exportName(L"campaign").c_str()); break;
+                case ID_BROWSE:
+                    browse();
+                    applyPath();
+                    break;
+                case ID_RELOAD:
+                    applyPath();
+                    break;
+                case ID_LOAD_HIST:
+                    pastEventsMenu();
+                    break;
+                case ID_THEME_SEL:
+                    themeMenu();
+                    break;
+                case ID_RESTORE_GEN:
+                    restoreSession(gMapFile);
+                    break;
+                case ID_RESTORE_CMP:
+                    restoreSession(gCmpFile);
+                    break;
+                case ID_CMP_RESET:
+                    resetCampaignRun();
+                    break;
+                case ID_GEN_RESET:
+                    resetGeneralSession();
+                    break;
+                case ID_SUM_RESET:
+                    resetSummaryData();
+                    break;
+                case ID_EXP_GEN:
+                    exportListView(hHist, exportName(L"maps").c_str());
+                    break;
+                case ID_EXP_SUM:
+                    exportListView(hSumList, exportName(L"summary").c_str());
+                    break;
+                case ID_EXP_CMP:
+                    exportListView(hCmpList, exportName(L"campaign").c_str());
+                    break;
                 case ID_REC_MINUS:
                 case ID_REC_PLUS:
                     setOverlayRecords(gOvRecords + (LOWORD(wp) == ID_REC_PLUS ? 1 : -1));
@@ -188,7 +237,9 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     WritePrivateProfileStringW(L"main", L"AutoUpdate", gAutoUpdate ? L"1" : L"0", iniPath().c_str());
                     InvalidateRect(hUpdChk, nullptr, FALSE);
                     break;
-                case ID_UPD_TAB: updCheck(true); break;
+                case ID_UPD_TAB:
+                    updCheck(true);
+                    break;
 #endif
                 case ID_EXIT:
                     gExiting = true;
@@ -205,15 +256,14 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 case ID_CMP_STOP:
                     campaignAction(g.cmpClock == Tracker::Clock::Stopped ? HK_START : HK_STOP);
                     break;
-                case ID_CMP_PAUSE: campaignAction(HK_PAUSE); break;
+                case ID_CMP_PAUSE:
+                    campaignAction(HK_PAUSE);
+                    break;
                 case ID_KEY_BTN0:
                 case ID_KEY_BTN1:
                 case ID_KEY_BTN2:
                 case ID_KEY_BTN3:
                     beginKeyCapture(LOWORD(wp) - ID_KEY_BTN0);
-                    break;
-                case ID_KEYS_CHK:
-                    toggleHotkeys();
                     break;
                 case ID_ONTOP:
                     setOnTop(!gOnTopOn);
@@ -245,6 +295,13 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     break;
             }
             return 0;
+        case WM_CONTEXTMENU:  // right-click on a hotkey button: Remove
+            for (int i = 0; i < HK_COUNT; ++i)
+                if ((HWND)wp == hKeyBtn[i]) {
+                    hotkeyMenu(i, lp);
+                    return 0;
+                }
+            break;
         case WM_IMPORTED:
             importDone((ImportResult*)lp);
             return 0;
@@ -340,18 +397,27 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
     gOvRecords = std::clamp((int)ovIniInt(L"Records", 4), 0, 10);
     SetWindowTextW(hRecVal, std::to_wstring(gOvRecords).c_str());
     setOverlayTransparency(ovIniInt(L"Transparency", 10));
+    setClickThru(ovIniInt(L"ClickThrough", 1) != 0);
     gStartInTray = GetPrivateProfileIntW(L"main", L"StartInTray", 1, iniPath().c_str()) != 0;
     gGameVisible = false;
     // react at once when the game is minimized / restored (the 0.5 s poll covers start / close)
-    SetWinEventHook(EVENT_SYSTEM_MINIMIZESTART, EVENT_SYSTEM_MINIMIZEEND, nullptr,
-                    [](HWINEVENTHOOK, DWORD, HWND, LONG, LONG, DWORD, DWORD) { updateOverlayVisibility(); }, 0, 0,
-                    WINEVENT_OUTOFCONTEXT);
+    SetWinEventHook(
+        EVENT_SYSTEM_MINIMIZESTART, EVENT_SYSTEM_MINIMIZEEND, nullptr,
+        [](HWINEVENTHOOK, DWORD, HWND, LONG, LONG, DWORD, DWORD) { updateOverlayVisibility(); }, 0, 0,
+        WINEVENT_OUTOFCONTEXT);
+    // and when the game comes back to the front (overlays are raised above it again)
+    SetWinEventHook(
+        EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr,
+        [](HWINEVENTHOOK, DWORD, HWND, LONG, LONG, DWORD, DWORD) { updateOverlayVisibility(); }, 0, 0,
+        WINEVENT_OUTOFCONTEXT);
     if (ovIniInt(L"On", 1)) showOverlay(true);
     if (GetPrivateProfileIntW(kCbSec, L"On", 0, iniPath().c_str())) showCmdBar(true);
+    if (GetPrivateProfileIntW(L"GraphOverlay", L"On", 0, iniPath().c_str())) showGraphOverlay(true);
     if (firstRun || !gStartInTray || updated) ShowWindow(h, show);
 #ifdef UPDATE_REPO
     gAutoUpdate = GetPrivateProfileIntW(L"main", L"AutoUpdate", 1, iniPath().c_str()) != 0;
-    if (updated) MessageBoxW(h, (L"Updated to v" + W(APP_VERSION) + L".").c_str(), L"Poe2 | MapStat", MB_ICONINFORMATION);
+    if (updated)
+        MessageBoxW(h, (L"Updated to v" + W(APP_VERSION) + L".").c_str(), L"Poe2 | MapStat", MB_ICONINFORMATION);
     else if (gAutoUpdate) SetTimer(h, ID_TIMER_UPD, 5000, nullptr);  // check a few seconds after start
 #endif  // first start shows the window so it can be found
 

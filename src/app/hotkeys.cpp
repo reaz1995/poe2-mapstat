@@ -11,10 +11,10 @@ struct HotKey {
 };
 
 HotKey gKeys[HK_COUNT] = {
-    {L"CampaignStop", VK_F9, 0},
-    {L"CampaignPause", VK_F10, 0},
-    {L"CampaignStart", VK_F11, 0},
-    {L"LayoutScreenshot", VK_F8, 0},
+    {L"CampaignStop", 0, 0},  // no keys set at first: they are picked in Options
+    {L"CampaignPause", 0, 0},
+    {L"CampaignStart", 0, 0},
+    {L"LayoutScreenshot", 0, 0},
 };
 
 HHOOK gHook = nullptr;
@@ -23,10 +23,17 @@ bool gDown[256] = {};
 
 bool isModifier(UINT vk) {
     switch (vk) {
-        case VK_SHIFT: case VK_LSHIFT: case VK_RSHIFT:
-        case VK_CONTROL: case VK_LCONTROL: case VK_RCONTROL:
-        case VK_MENU: case VK_LMENU: case VK_RMENU:
-        case VK_LWIN: case VK_RWIN:
+        case VK_SHIFT:
+        case VK_LSHIFT:
+        case VK_RSHIFT:
+        case VK_CONTROL:
+        case VK_LCONTROL:
+        case VK_RCONTROL:
+        case VK_MENU:
+        case VK_LMENU:
+        case VK_RMENU:
+        case VK_LWIN:
+        case VK_RWIN:
             return true;
     }
     return false;
@@ -73,8 +80,18 @@ LRESULT CALLBACK keyProc(int code, WPARAM wp, LPARAM lp) {
 std::wstring keyText(UINT vk) {
     UINT sc = MapVirtualKeyW(vk, MAPVK_VK_TO_VSC);
     switch (vk) {  // keys that share scan codes with the numpad need the extended bit
-        case VK_INSERT: case VK_DELETE: case VK_HOME: case VK_END: case VK_PRIOR: case VK_NEXT:
-        case VK_LEFT: case VK_RIGHT: case VK_UP: case VK_DOWN: case VK_DIVIDE: case VK_NUMLOCK:
+        case VK_INSERT:
+        case VK_DELETE:
+        case VK_HOME:
+        case VK_END:
+        case VK_PRIOR:
+        case VK_NEXT:
+        case VK_LEFT:
+        case VK_RIGHT:
+        case VK_UP:
+        case VK_DOWN:
+        case VK_DIVIDE:
+        case VK_NUMLOCK:
             sc |= 0x100;
     }
     wchar_t b[64] = L"";
@@ -96,10 +113,9 @@ void endCapture() {
 
 }  // namespace
 
-bool gHotkeysOn = false;
+bool gHotkeysOn = true;  // always: a key that is not set does nothing
 
 void loadHotkeys() {
-    gHotkeysOn = GetPrivateProfileIntW(L"hotkeys", L"Enabled", 0, iniPath().c_str()) != 0;
     for (auto& k : gKeys) {
         wchar_t b[32];
         GetPrivateProfileStringW(L"hotkeys", k.iniKey, L"", b, 32, iniPath().c_str());
@@ -131,14 +147,6 @@ std::wstring hotkeyName(int i) {
     return s + keyText(k.vk);
 }
 
-void toggleHotkeys() {
-    gHotkeysOn = !gHotkeysOn;
-    WritePrivateProfileStringW(L"hotkeys", L"Enabled", gHotkeysOn ? L"1" : L"0", iniPath().c_str());
-    InvalidateRect(hKeysChk, nullptr, FALSE);
-    refreshCampaign(true);
-    refreshLayouts();
-}
-
 void beginKeyCapture(int i) {
     endCapture();
     gCapture = i;
@@ -167,16 +175,42 @@ void keyCaptured(UINT vk, int mods) {
     refreshLayouts();
 }
 
+// Right-click on a hotkey button: Remove sets it to "Not set".
+void hotkeyMenu(int i, LPARAM at) {
+    POINT pt = {(short)LOWORD(at), (short)HIWORD(at)};
+    if (at == (LPARAM)-1) {  // from the keyboard: under the button
+        RECT r;
+        GetWindowRect(hKeyBtn[i], &r);
+        pt = {r.left, r.bottom};
+    }
+    HMENU m = CreatePopupMenu();
+    AppendMenuW(m, MF_STRING | (gKeys[i].vk ? 0 : MF_GRAYED), 1, L"Remove");
+    int cmd = TrackPopupMenu(m, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hMain, nullptr);
+    DestroyMenu(m);
+    if (cmd != 1) return;
+    if (gCapture == i) endCapture();
+    gKeys[i].vk = 0, gKeys[i].mods = 0;
+    saveKey(i);
+    SetWindowTextW(hKeyBtn[i], hotkeyName(i).c_str());
+    refreshCampaign(true);
+    refreshLayouts();
+}
+
 void campaignAction(int i) {
     uint32_t now = nowTick();
     switch (i) {
-        case HK_STOP: g.stopCampaign(now); break;
-        case HK_PAUSE: g.toggleCampaignPause(now); break;
+        case HK_STOP:
+            g.stopCampaign(now);
+            break;
+        case HK_PAUSE:
+            g.toggleCampaignPause(now);
+            break;
         case HK_START:
             if (g.cmpClock != Tracker::Clock::Stopped) return;  // Start only follows a Stop
             startCampaignRun();
             break;
-        default: return;
+        default:
+            return;
     }
     saveData();
     refreshCampaign(true);

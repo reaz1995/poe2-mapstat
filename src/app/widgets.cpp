@@ -101,13 +101,15 @@ void drawButton(const DRAWITEMSTRUCT* d) {
     if (kind == Btn::Check) {
         RECT box = {r.left, r.top + (r.bottom - r.top - 18) / 2, r.left + 18, 0};
         box.bottom = box.top + 18;
-        bool on = d->hwndItem == hOverlayChk ? gOverlayOn
-                  : d->hwndItem == hCloseChk ? gStartInTray
-                  : d->hwndItem == hUpdChk   ? gAutoUpdate
-                  : d->hwndItem == hCmdChk   ? gCmdOn
-                  : d->hwndItem == hExpOvChk ? gExpOnOverlay
-                  : d->hwndItem == hKeysChk  ? gHotkeysOn
-                                             : gOnTopOn;
+        bool on = d->hwndItem == hOverlayChk   ? gOverlayOn
+                  : d->hwndItem == hCloseChk   ? gStartInTray
+                  : d->hwndItem == hUpdChk     ? gAutoUpdate
+                  : d->hwndItem == hCmdChk     ? gCmdOn
+                  : d->hwndItem == hGraphChk   ? gGraphOn
+                  : d->hwndItem == hClickChk   ? gClickThru
+                  : d->hwndItem == hExpOvChk   ? gExpOnOverlay
+                  : d->hwndItem == hLayCropChk ? gLayoutCrop
+                                               : gOnTopOn;
         fillRound(dc, box, 6, on ? C::Purple : C::Card, on ? C::Purple : (hover ? C::Purple : C::Comment));
         if (on) {
             HPEN pen = CreatePen(PS_SOLID, 2, C::Darkest);
@@ -161,7 +163,11 @@ LRESULT CALLBACK BtnProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD
 
 void measureMenu(MEASUREITEMSTRUCT* m) {
     auto* it = (MenuItem*)m->itemData;
-    if (it->separator) { m->itemHeight = 9; m->itemWidth = 10; return; }
+    if (it->separator) {
+        m->itemHeight = 9;
+        m->itemWidth = 10;
+        return;
+    }
     HDC dc = GetDC(hMain);
     HGDIOBJ of = SelectObject(dc, fNormal);
     SIZE sz;
@@ -190,8 +196,11 @@ void drawMenu(const DRAWITEMSTRUCT* d) {
     }
     SetBkMode(d->hDC, TRANSPARENT);
     SelectObject(d->hDC, fNormal);
-    COLORREF col = d->itemID == 1 || d->itemID == 31 ? C::Pink : d->itemID == 2 ? C::Green
-                 : d->itemID == 12 ? C::Orange  : d->itemID >= 20 ? C::Purple : C::Cyan;
+    COLORREF col = d->itemID == 1 || d->itemID == 31 ? C::Pink
+                   : d->itemID == 2                  ? C::Green
+                   : d->itemID == 12                 ? C::Orange
+                   : d->itemID >= 20                 ? C::Purple
+                                                     : C::Cyan;
     SetTextColor(d->hDC, off ? C::Comment : sel ? C::Fg : col);
     if (d->itemState & ODS_CHECKED) {  // active sort direction
         RECT dot = {r.left + 6, (r.top + r.bottom) / 2 - 3, r.left + 12, (r.top + r.bottom) / 2 + 3};

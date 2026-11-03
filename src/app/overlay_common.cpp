@@ -1,6 +1,5 @@
-// Shared by both overlays: show only with the game, snapping while dragging, right-click menu.
+// Shared by the overlays: show only with the game, snapping while dragging, right-click menu.
 #include "app.h"
-
 
 // Windows feeds the snapped rect back into the next WM_MOVING, so snapping that rect would stick forever.
 // Work from where the drag started + how far the mouse moved, then snap.
@@ -22,30 +21,56 @@ void snapOverlay(HWND self, RECT* r) {
     r->right = r->left + w;
     r->bottom = r->top + h;
     int bestDx = T + 1, bestDy = T + 1, nx = r->left, ny = r->top;
-    auto tryX = [&](int x) { if (abs(x - r->left) < bestDx) { bestDx = abs(x - r->left); nx = x; } };
-    auto tryY = [&](int y) { if (abs(y - r->top) < bestDy) { bestDy = abs(y - r->top); ny = y; } };
-    for (HWND o : {hOverlay, hCmdBar}) {
+    auto tryX = [&](int x) {
+        if (abs(x - r->left) < bestDx) {
+            bestDx = abs(x - r->left);
+            nx = x;
+        }
+    };
+    auto tryY = [&](int y) {
+        if (abs(y - r->top) < bestDy) {
+            bestDy = abs(y - r->top);
+            ny = y;
+        }
+    };
+    for (HWND o : {hOverlay, hCmdBar, hGraphOv, hLayoutOv}) {
         if (!o || o == self || !IsWindowVisible(o)) continue;
         RECT q;
         GetWindowRect(o, &q);
-        bool nearV = r->bottom + T >= q.top && r->top - T <= q.bottom;   // vertically close -> x snaps make sense
-        bool nearH = r->right + T >= q.left && r->left - T <= q.right;   // horizontally close -> y snaps make sense
-        if (nearV) { tryX(q.left); tryX(q.right - w); tryX(q.right + G); tryX(q.left - w - G); }
-        if (nearH) { tryY(q.top); tryY(q.bottom - h); tryY(q.bottom + G); tryY(q.top - h - G); }
+        bool nearV = r->bottom + T >= q.top && r->top - T <= q.bottom;  // vertically close -> x snaps make sense
+        bool nearH = r->right + T >= q.left && r->left - T <= q.right;  // horizontally close -> y snaps make sense
+        if (nearV) {
+            tryX(q.left);
+            tryX(q.right - w);
+            tryX(q.right + G);
+            tryX(q.left - w - G);
+        }
+        if (nearH) {
+            tryY(q.top);
+            tryY(q.bottom - h);
+            tryY(q.bottom + G);
+            tryY(q.top - h - G);
+        }
     }
     MONITORINFO mi = {};
     mi.cbSize = sizeof mi;
     if (GetMonitorInfoW(MonitorFromRect(r, MONITOR_DEFAULTTONEAREST), &mi)) {
-        tryX(mi.rcWork.left); tryX(mi.rcWork.right - w);
-        tryY(mi.rcWork.top); tryY(mi.rcWork.bottom - h);
+        tryX(mi.rcWork.left);
+        tryX(mi.rcWork.right - w);
+        tryY(mi.rcWork.top);
+        tryY(mi.rcWork.bottom - h);
     }
     RECT g;
     if (gameClientRect(g)) {  // and to the inside edges of the game window
-        tryX(g.left); tryX(g.right - w);
-        tryY(g.top); tryY(g.bottom - h);
+        tryX(g.left);
+        tryX(g.right - w);
+        tryY(g.top);
+        tryY(g.bottom - h);
     }
-    r->left = nx; r->right = nx + w;
-    r->top = ny; r->bottom = ny + h;
+    r->left = nx;
+    r->right = nx + w;
+    r->top = ny;
+    r->bottom = ny + h;
 }
 
 HWND findGame() {
@@ -99,13 +124,18 @@ void updateOverlayVisibility() {
     HWND game = findGame();
     gGameVisible = game && !IsIconic(game);
     bool wantOv = hOverlay && gOverlayOn && gGameVisible, wantCb = hCmdBar && gCmdOn && gGameVisible;
+    bool wantGr = hGraphOv && gGraphOn && gGameVisible;
+    bool wantLo = hLayoutOv && layoutOverlayShown() && gGameVisible;
     RECT g;
-    if ((wantOv || wantCb) && gameClientRect(g)) {
+    if ((wantOv || wantCb || wantGr || wantLo) && gameClientRect(g)) {
         // game moved / resized, or an overlay is about to appear: place it first, so it never flashes at the old spot
-        bool appearing = (wantOv && !IsWindowVisible(hOverlay)) || (wantCb && !IsWindowVisible(hCmdBar));
+        bool appearing = (wantOv && !IsWindowVisible(hOverlay)) || (wantCb && !IsWindowVisible(hCmdBar)) ||
+                         (wantGr && !IsWindowVisible(hGraphOv)) || (wantLo && !IsWindowVisible(hLayoutOv));
         if (appearing || !EqualRect(&g, &lastGame)) {
             if (wantOv) anchorApply(hOverlay, L"MapTimerOverlay", g);
             if (wantCb) anchorApply(hCmdBar, kCbSec, g);
+            if (wantGr) anchorApply(hGraphOv, L"GraphOverlay", g);
+            if (wantLo) anchorApply(hLayoutOv, L"LayoutOverlay", g);
             lastGame = g;
         }
     }
@@ -114,6 +144,21 @@ void updateOverlayVisibility() {
     };
     set(hOverlay, gOverlayOn && gGameVisible);
     set(hCmdBar, gCmdOn && gGameVisible);
+    set(hGraphOv, wantGr);
+    set(hLayoutOv, wantLo);
+
+    // When the game gets the focus back (e.g. after a picture viewer), borderless fullscreen puts it above the
+    // topmost overlays. They are raised again then, and on the next polls too, as the game can take a moment.
+    static HWND lastFg = nullptr;
+    static int raise = 0;
+    HWND fg = GetForegroundWindow();
+    if (fg != lastFg) lastFg = fg, raise = 3;
+    if (raise > 0 && game && fg == game) {
+        --raise;
+        for (HWND w : {hOverlay, hCmdBar, hGraphOv, hLayoutOv})
+            if (w && IsWindowVisible(w))
+                SetWindowPos(w, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    }
 }
 
 // Right-click menu of an overlay (Dracula owner-drawn like the column menu).
@@ -145,6 +190,17 @@ void overlayMenu(HWND ov) {
         AppendMenuW(m, MF_OWNERDRAW | (items[i].first ? 0 : MF_DISABLED), items[i].first, (LPCWSTR)&gMenuItems[i]);
     POINT pt;
     GetCursorPos(&pt);
+    // Opened with Alt held (click-through): letting go of Alt would close the menu at once, so it opens once Alt
+    // is up.
+    for (ULONGLONG t0 = GetTickCount64(); (GetAsyncKeyState(VK_MENU) & 0x8000) && GetTickCount64() - t0 < 5000;) {
+        MSG msg;
+        while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+            if (msg.message == WM_SYSKEYUP || msg.message == WM_KEYUP) continue;  // the Alt release itself
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+        Sleep(15);
+    }
     SetForegroundWindow(ov);  // so the menu closes when clicking elsewhere
     int cmd = TrackPopupMenu(m, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, ov, nullptr);
     PostMessageW(ov, WM_NULL, 0, 0);
@@ -161,6 +217,11 @@ void overlayMenu(HWND ov) {
         if (ov == hOverlay) {
             showOverlay(false);
             ovIniSet(L"On", 0);
+        } else if (ov == hLayoutOv) {
+            layoutOverlayHide();  // until the next layout screenshot
+        } else if (ov == hGraphOv) {
+            showGraphOverlay(false);
+            WritePrivateProfileStringW(L"GraphOverlay", L"On", L"0", iniPath().c_str());
         } else {
             showCmdBar(false);
             WritePrivateProfileStringW(kCbSec, L"On", L"0", iniPath().c_str());
@@ -168,4 +229,46 @@ void overlayMenu(HWND ov) {
     }
 }
 
+// Click-through: the overlays get WS_EX_TRANSPARENT (with WS_EX_LAYERED, clicks then reach the window below: the
+// game). Holding Alt takes it off, so they can be clicked, dragged, resized or right-clicked; a drag started with
+// Alt goes on until the mouse button is let go.
+bool gClickThru = true;
+HWND hClickChk = nullptr;
+static bool gThruNow = false;  // what the overlays have now
 
+static void applyThru(bool thru) {
+    for (HWND o : {hOverlay, hCmdBar, hGraphOv, hLayoutOv}) {
+        if (!o) continue;
+        LONG_PTR ex = GetWindowLongPtrW(o, GWL_EXSTYLE);
+        LONG_PTR want = thru ? ex | WS_EX_TRANSPARENT : ex & ~(LONG_PTR)WS_EX_TRANSPARENT;
+        if (want != ex) SetWindowLongPtrW(o, GWL_EXSTYLE, want);
+    }
+    gThruNow = thru;
+}
+
+void clickThruPoll() {
+    bool alt = GetAsyncKeyState(VK_MENU) & 0x8000;
+    bool button = (GetAsyncKeyState(VK_LBUTTON) | GetAsyncKeyState(VK_RBUTTON)) & 0x8000;
+    bool thru = gClickThru && !alt && !(button && !gThruNow);  // keep usable mid-drag
+    if (thru != gThruNow || thru) applyThru(thru);  // also catches overlays created since
+}
+
+void setClickThru(bool on) {
+    gClickThru = on;
+    ovIniSet(L"ClickThrough", on ? 1 : 0);
+    applyThru(on);
+    if (hClickChk) InvalidateRect(hClickChk, nullptr, FALSE);
+}
+
+// Overlays are left out of screenshots (Windows 10 2004 and later): the game's own capture, the snipping tool and
+// other screenshot tools see the game under them. Elsewhere they are hidden for a moment while the app captures.
+bool hideFromCapture(HWND h) {
+    typedef BOOL(WINAPI * Fn)(HWND, DWORD);
+    static Fn f = (Fn)(void*)GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetWindowDisplayAffinity");
+    const DWORD WDA_EXCLUDEFROMCAPTURE_ = 0x11;
+    if (!h || !f || !f(h, WDA_EXCLUDEFROMCAPTURE_)) return false;
+    SetPropW(h, L"Poe2MapStat.NoCapture", (HANDLE)1);
+    return true;
+}
+
+bool capturedOnScreen(HWND h) { return h && !GetPropW(h, L"Poe2MapStat.NoCapture"); }

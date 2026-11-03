@@ -49,7 +49,10 @@ static const int kOvExp = 18;
 static bool gOvExp = false;
 
 static int ovHeight(double sc, int n) {
-    return (int)((kOvPad * 2 + kOvHead + (gOvExp ? 2 * kOvExp : 0) + (n ? 9 + n * kOvLine : 0) + (gOvFoot ? kOvFoot : 0)) * sc + 0.5);
+    return (
+        int)((kOvPad * 2 + kOvHead + (gOvExp ? 2 * kOvExp : 0) + (n ? 9 + n * kOvLine : 0) + (gOvFoot ? kOvFoot : 0)) *
+                 sc +
+             0.5);
 }
 
 static void overlayData(OvLine& head, std::vector<OvLine>& last, COLORREF& timeCol) {
@@ -281,16 +284,18 @@ static void paintOverlay(HDC dc, RECT rc) {
     // Footer: time of the current act and of the whole campaign run
     uint32_t now = nowTick();
     std::string act = Tracker::actOf(g.curZone >= 0 ? g.zones[g.curZone].areaId : g.location);
-    COLORREF clockCol = g.cmpClock == Tracker::Clock::Stopped ? C::Red
-                      : g.cmpClock == Tracker::Clock::Paused  ? C::Yellow
-                      : g.curZone >= 0 && g.zones[g.curZone].inSegment ? C::Purple : C::Cyan;
+    COLORREF clockCol = g.cmpClock == Tracker::Clock::Stopped            ? C::Red
+                        : g.cmpClock == Tracker::Clock::Paused           ? C::Yellow
+                        : g.curZone >= 0 && g.zones[g.curZone].inSegment ? C::Purple
+                                                                         : C::Cyan;
     uint64_t actMs = 0, totalMs = 0;
     for (auto& z : g.zones) {
         uint64_t ms = z.activeAt(now);
         totalMs += ms;
         if (Tracker::actOf(z.areaId) == act) actMs += ms;
     }
-    int y = P + HH + XH + (gOvRecords > 0 ? (int)(9 * S) + gOvRecords * LH : 0) + (int)(4 * S);  // below the record lines
+    int y =
+        P + HH + XH + (gOvRecords > 0 ? (int)(9 * S) + gOvRecords * LH : 0) + (int)(4 * S);  // below the record lines
     RECT sep2 = {P, y, rc.right - P, y + 1};
     b = CreateSolidBrush(C::Line);
     FillRect(dc, &sep2, b);
@@ -358,13 +363,15 @@ void setOverlayRecords(int n) {
 
 BYTE overlayAlpha() { return (BYTE)std::lround(255 * (100 - gOvTransparency) / 100.0); }
 
-// Applies to both overlays.
+// Applies to all overlays.
 void setOverlayTransparency(int pct) {
     gOvTransparency = std::clamp(pct, 0, 100);
     ovIniSet(L"Transparency", gOvTransparency);
     SetWindowTextW(hAlphaVal, (std::to_wstring(gOvTransparency) + L"%").c_str());
     if (hOverlay) SetLayeredWindowAttributes(hOverlay, 0, overlayAlpha(), LWA_ALPHA);
     if (hCmdBar) SetLayeredWindowAttributes(hCmdBar, 0, overlayAlpha(), LWA_ALPHA);
+    if (hGraphOv) SetLayeredWindowAttributes(hGraphOv, 0, overlayAlpha(), LWA_ALPHA);
+    if (hLayoutOv) SetLayeredWindowAttributes(hLayoutOv, 0, overlayAlpha(), LWA_ALPHA);
 }
 
 // Campaign footer: shown whenever the player is in a campaign zone. Experience lines: when turned on.
@@ -475,9 +482,10 @@ void showOverlay(bool on) {
         int w = ovIniInt(L"W", kOvW);
         int h = ovIniInt(L"H", ovHeight((double)w / kOvW, gOvRecords));
         hOverlay = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
-                                   wc.lpszClassName, L"MapTimerOverlay", WS_POPUP | WS_THICKFRAME, x, y, w, h,
-                                   nullptr, nullptr, wc.hInstance, nullptr);
+                                   wc.lpszClassName, L"MapTimerOverlay", WS_POPUP | WS_THICKFRAME, x, y, w, h, nullptr,
+                                   nullptr, wc.hInstance, nullptr);
         SetLayeredWindowAttributes(hOverlay, 0, overlayAlpha(), LWA_ALPHA);
+        hideFromCapture(hOverlay);
         DWMNCRENDERINGPOLICY ncr = DWMNCRP_DISABLED;  // no DWM frame/shadow around the overlay
         DwmSetWindowAttribute(hOverlay, DWMWA_NCRENDERING_POLICY, &ncr, sizeof ncr);
         overlayResized(w, h);
