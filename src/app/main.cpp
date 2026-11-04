@@ -128,6 +128,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_HOTKEY_ACT:
             if ((int)wp == HK_LAYOUT) takeLayoutShot();
             else if ((int)wp == HK_STEP_DONE || (int)wp == HK_STEP_UNDO) stepsAction((int)wp);
+            else if ((int)wp == HK_STEP_EXPAND) stepsOverlayExpand(lp == 0);
             else campaignAction((int)wp);
             return 0;
         case WM_CLIPBOARDUPDATE:
@@ -210,9 +211,6 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     InvalidateRect(hCmpBestChk, nullptr, FALSE);
                     ovSyncFooter();  // the previous act's line comes or goes
                     if (hOverlay) InvalidateRect(hOverlay, nullptr, FALSE);
-                    break;
-                case ID_ZONES_IMPORT:
-                    importAreaTables();
                     break;
                 case ID_OPT_PILL0:
                 case ID_OPT_PILL1:

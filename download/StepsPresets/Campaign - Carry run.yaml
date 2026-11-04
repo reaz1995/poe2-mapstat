@@ -1,0 +1,236 @@
+# Poe2 | MapStat - carry run: a carry takes a leecher through Acts 1-4 and the Interludes
+# "Follow" = the leecher follows the carry through the zone. "Gate skip" = the leecher waits, the carry clears
+# the zone and opens the way. "Exp zone" = the leecher stays in to level. "Level" = the leecher's level when done.
+# "+ Act N" ... "+": a section, double-click it in the editor to fold / unfold.
+
++ Act 1
+The Grelwood
+  Leecher: talk to the NPC
+
+The Red Vale
+  Follow
+    Level 5
+  Leecher: back to Clearfell Encampment
+
+The Red Vale -> Clearfell Encampment
+  Leecher: talk to Renly, then go to the tree in The Grelwood
+
+Clearfell Encampment -> The Grelwood
+  Leecher: stab the Rune Spikes into the tree
+
+The Grim Tangle
+  Leecher: back to town, talk to Una
+  Leecher: back here, talk to Una again
+
+Cemetery of the Eternals
+  Follow
+  Kill Lachlann (after both Key Pieces)
+
+Tomb of the Consort
+  Leecher enters first (lower level zone)
+  Follow
+    Level 7
+
+Mausoleum of the Praetor
+  Waypoint there
+  Follow
+    Level 9
+
+Ogham Village
+  Follow
+    Level 11
+
+Ogham Manor
+  Follow
+    Level 13
++
+
++ Act 2
+Vastiri Outskirts
+  Follow
+    Level 14
+  Leecher: tag the waypoint of The Halani Gates
+    Level 14
+
+Mawdun Mine
+  Follow
+    Level 16
+
+The Halani Gates
+  Follow
+    Level 17
+
+The Bone Pits
+  Reset the zone for the leecher
+  Follow
+    Level 19
+
+The Titan Grotto
+  Leecher: wait near the Valley of the Titans entrance
+    Level 19
+
+Valley of the Titans
+  Leecher starts in their own instance
+    Level 20.5
+
+Buried Shrines
+  Follow
+
+Deshar
+  Leecher: unlock Deshar
+    Level 27
+
+Mastodon Badlands
+  Exp zone, at the carry's zone level
+
+The Spires of Deshar
+  Follow
+    Level 28
+
+Dreadnought
+  Follow
+    Level 29
++
+
++ Act 3
+Ziggurat Encampment
+  Go to Chimeral Wetlands
+
+Chimeral Wetlands
+  Exp zone
+    The leecher has to be at least level 29
+    Level 32
+
+Jiquani's Machinarium
+  Open the first gate, then skip
+    Level 32
+
+Jiquani's Sanctum
+  Leecher: wait at the start
+    Level 32
+
+Jungle Ruins
+  Leecher: use the crystal to open The Matlan Waterways
+    Level 32
+
+The Matlan Waterways
+  Waypoint to the middle of the zone
+  Leecher waits, the carry uses the lever
+    Level 32
+
+Apex of Filth
+  Gate skip
+    Level 32
+
+Temple of Kopec
+  Gate skip
+    Level 32
+
+The Drowned City
+  Exp zone
+    Level 40
+
+Utzaal
+  Exp zone
+    Level 43
+
+The Black Chambers
+  Follow
+    Level 43
++
+
++ Act 4
+Shrike Island
+  Reset to the leecher's zone, follow
+    1 level more for Isle of Kin
+    Level 44
+
+Solitary Confinement
+  Reset to the leecher's zone, follow
+    1 level more for Isle of Kin
+    Level 45
+
+Singing Caverns
+  Gate skip
+    1 level more for Isle of Kin
+    Level 45
+
+Volcanic Warrens
+  Gate skip
+    Level 45
+
+Isle of Kin
+  Exp zone
+    Level 47
+
+Kingsmarch
+  Leecher: talk to Makoru to unlock Arastas
+
+Arastas
+  Cutscene
+
+The Excavation
+  Gate skip
+    Level 47
+
+Heart of the Tribe
+  Follow
+    Level 48
++
+
++ Interludes
+# ---- Recruit the Maraketh
+
+Pools of Khatal
+  Exp zone
+    Level 50
+
+Sel Khari Sanctuary
+  Follow
+    Level 50
+
+The Galai Gates
+  Leecher: stay and wait at the start
+
+Qimah
+  Exp zone
+  Leecher: take the boon
+    Level 54
+
+Qimah Reservoir
+  Gate skip
+  Leecher: talk to Jado at the end
+
+# ---- Recruit the Vaal
+
+Kriar Village
+  Leecher: wait at the start
+
+Glacial Tarn
+  Gate skip
+
+Etched Ravine
+  Gate skip
+
+The Cuachic Vault
+  Gate skip
+  Leecher: be at the end to spawn Doryani
+
+# ---- Recruit the Ezomytes
+
+The Refuge
+  Leecher enters Scorched Farmlands first
+
+Scorched Farmlands
+  Follow, tag The Blackwood
+  Leecher enters Stones of Serle first
+    Level 54
+
+Stones of Serle
+  Follow
+    Level 55
+  Leecher: tag The Blackwood again
+
+Holten Estate
+  Gate skip
++

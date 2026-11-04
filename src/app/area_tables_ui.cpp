@@ -91,26 +91,3 @@ void areaTablesChanged() {
     graphOverlayRefresh();
     if (hOverlay) InvalidateRect(hOverlay, nullptr, FALSE);
 }
-
-// Options -> Load zone names...: zones.txt / acts.txt files (e.g. from download/ZoneNames). Their names replace the
-// app's ("unknown" in them does not), ids the app doesn't have are added.
-void importAreaTables() {
-    auto files = pickFiles(hMain, L"Load zone / act names", L"Name tables (zones.txt, acts.txt)", L"*.txt");
-    if (files.empty()) return;
-    int zones = 0, acts = 0, bad = 0;
-    for (auto& f : files) {
-        AreaTable t;
-        t.parse(readFileUtf8(f));
-        if (t.entries().empty()) {
-            ++bad;
-            continue;
-        }
-        bool a = t.isActTable();
-        (a ? acts : zones) += (a ? actTable() : zoneTable()).takeNames(t);
-        save(a);
-    }
-    areaTablesChanged();
-    std::wstring msg = std::to_wstring(zones) + L" zone name(s) and " + std::to_wstring(acts) + L" act name(s) loaded.";
-    if (bad) msg += L"\n" + std::to_wstring(bad) + L" file(s) had no names (\"id = name\" lines).";
-    MessageBoxW(hMain, msg.c_str(), L"Zone names", MB_ICONINFORMATION);
-}

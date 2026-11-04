@@ -9,11 +9,6 @@ Leveling steps for the **Steps** tab, one `.yaml` file per preset (zone at the s
 indented by 2 spaces; see the README of the app). Import them with **Steps → Import...**: pick one or more files, or a
 folder to import every preset in it. Name the file after what it is, e.g. `Act 1-4 fast - Witch.yaml`.
 
-## ZoneNames
-
-Zone and act names by area id (`zones.txt`, `acts.txt`), the same format as `%APPDATA%\Poe2MapStat\tables`. Load
-them with **Options → Load zone names...**: their names replace the app's ("unknown" in them does not).
-
 ## Layouts
 
 Layout pictures for the **Layouts** tab: zone outlines (`<seed>.png`) and graphs (`graph.png`), sorted into

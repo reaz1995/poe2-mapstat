@@ -53,9 +53,33 @@ static bool gOvFootPrev = false;  // with Compare zone times: the previous act's
 static const int kOvExp = 18;
 static bool gOvExp = false;
 
+// With the experience lines: a small "good exp area" / "very good exp area" under the header in campaign zones known
+// to level well. 1 = good, 2 = very good. Cruel versions (C_...) count the same.
+static const int kOvTier = 15;
+static int gOvTier = 0;
+
+static int expTier(std::string id) {
+    if (id.compare(0, 2, "C_") == 0) id = id.substr(2);
+    static const std::pair<const char*, int> kTier[] = {
+        {"G2_5_1", 1},  // Mastodon Badlands
+        {"G2_9_2", 1},  // The Spires of Deshar
+        {"G2_12", 1},   // Dreadnought
+        {"G3_5", 1},    // Chimeral Wetlands
+        {"G3_14", 1},   // Utzaal
+        {"G3_8", 2},    // The Drowned City
+        {"G4_1_1", 2},  // Isle of Kin
+        {"G4_11_2", 1}, // Heart of the Tribe
+        {"P2_2", 1},    // Pools of Khatal
+        {"P2_6", 2},    // Qimah
+    };
+    for (auto& [k, t] : kTier)
+        if (id == k) return t;
+    return 0;
+}
+
 static int ovHeight(double sc, int n) {
     return (
-        int)((kOvPad * 2 + kOvHead + (gOvExp ? (gOvFoot ? 4 : 3) * kOvExp : 0) + (n ? 9 + n * kOvLine : 0) + (gOvFoot ? kOvFoot : 0) + (gOvFootPrev ? kOvLine : 0)) *
+        int)((kOvPad * 2 + kOvHead + (gOvExp ? (gOvFoot ? 4 : 3) * kOvExp + (gOvTier ? kOvTier : 0) : 0) + (n ? 9 + n * kOvLine : 0) + (gOvFoot ? kOvFoot : 0) + (gOvFootPrev ? kOvLine : 0)) *
                  sc +
              0.5);
 }
@@ -199,7 +223,21 @@ static void paintOverlay(HDC dc, RECT rc) {
         if (gOvExp) h.lvl.clear(), h.range.clear();  // the area level moves to the experience line below
         line(h, P, HH, fOvHead, C::Pink, C::Fg, timeCol);
     }
-    const int XL = (int)(kOvExp * S), XH = gOvExp ? (gOvFoot ? 4 : 3) * XL : 0;  // 4th line in the campaign
+    const int XL = (int)(kOvExp * S), TH = gOvExp && gOvTier ? (int)(kOvTier * S) : 0;
+    const int XH = gOvExp ? (gOvFoot ? 4 : 3) * XL + TH : 0;  // 4th line in the campaign
+    if (TH) {  // "good exp area" in small print under the area name, a shade of green
+        SelectObject(dc, fOvTiny);
+        RECT r = {P, P + HH - (int)(2 * S), rc.right - P, P + HH + TH - (int)(2 * S)};
+        COLORREF g2 = C::Green, d = C::Darkest;
+        auto blend = [&](int pct) {  // the green, toned down towards the background
+            return RGB((GetRValue(g2) * pct + GetRValue(d) * (100 - pct)) / 100,
+                       (GetGValue(g2) * pct + GetGValue(d) * (100 - pct)) / 100,
+                       (GetBValue(g2) * pct + GetBValue(d) * (100 - pct)) / 100);
+        };
+        SetTextColor(dc, gOvTier == 2 ? C::Green : blend(70));
+        DrawTextW(dc, gOvTier == 2 ? L"very good exp area" : L"good exp area", -1, &r,
+                  DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    }
     if (gOvExp) {
         // Line 1: "Curr. area: 64 (56-64)  Your lvl: 88" and the exp bonus of the current area. The area level is
         // red when it is outside the safe range (3 + level / 16 levels around the character), the range in small
@@ -280,8 +318,8 @@ static void paintOverlay(HDC dc, RECT rc) {
             SetTextColor(dc, C::Comment);
             DrawTextW(dc, bonusCap.c_str(), -1, &rl, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
         };
-        expLine(P + HH, line1, mArea, vArea);
-        expLine(P + HH + XL, line2, mBest, vBest);
+        expLine(P + HH + TH, line1, mArea, vArea);
+        expLine(P + HH + TH + XL, line2, mBest, vBest);
         // Line 3: experience to the next level, and exp/h of the last level gained in one zone ("In Between"); line 4
         // in the campaign: exp/h of the whole run ("Total")
         auto rightValue = [&](int y, const wchar_t* cap, const std::wstring& val) {
@@ -296,7 +334,7 @@ static void paintOverlay(HDC dc, RECT rc) {
         };
         {
             std::wstring req = expRequiredText(), eph = expPerHourText();
-            int y = P + HH + 2 * XL;
+            int y = P + HH + TH + 2 * XL;
             RECT r = {P, y, rc.right - P, y + XL};
             SelectObject(dc, fOvSmall);
             std::wstring cap = shortCaps ? L"Req:" : L"Required exp:";
@@ -454,7 +492,9 @@ void ovSyncFooter() {
     bool exp = gExpOnOverlay && gExpLevel > 0 && !expNoMonsters();
     std::wstring n, t, c;
     bool prev = want && gOvCompare && previousAct(nowTick(), n, t, c);
-    if (want == gOvFoot && exp == gOvExp && prev == gOvFootPrev) return;
+    int tier = exp ? expTier(g.curZone >= 0 ? g.zones[g.curZone].areaId : g.location) : 0;
+    if (want == gOvFoot && exp == gOvExp && prev == gOvFootPrev && tier == gOvTier) return;
+    gOvTier = tier;
     gOvFootPrev = prev;
     gOvFoot = want;
     gOvExp = exp;

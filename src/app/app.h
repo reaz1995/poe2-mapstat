@@ -147,7 +147,6 @@ enum {
     ID_OPT_PILL0,
     ID_OPT_PILL1,
     ID_OPT_PILL2,
-    ID_ZONES_IMPORT,
     ID_STEPS_LBL,
     ID_STEPS_MINUS,
     ID_STEPS_VAL,
@@ -286,8 +285,6 @@ void campaignShowLists();
 extern HWND hOptPill[3];  // Options: Overlays, Hotkeys, Theme
 extern int gOptPill;
 void setOptPill(int i);
-extern HWND hZonesImport;  // Options: Load zone names...
-void importAreaTables();  // Options: Load zone names...
 extern HWND hLblPath, hPath, hBrowse, hReload, hOnTop, hOptInfo, hOptLbl, hLoadHist, hRestoreGen;
 extern HFONT fNormal, fBold, fTitle, fTimer, fSection, fTab;
 extern std::vector<HWND> gPages[PG_COUNT];
@@ -459,7 +456,7 @@ void campaignRunsHover(HWND lv, LPARAM lp);  // Campaign -> Summary: an act cell
 void summaryHover(HWND lv, LPARAM lp);
 
 // ---------------------------------------------------------------- hotkeys.cpp
-enum { HK_STOP, HK_PAUSE, HK_START, HK_LAYOUT, HK_STEP_DONE, HK_STEP_UNDO, HK_COUNT };
+enum { HK_STOP, HK_PAUSE, HK_START, HK_LAYOUT, HK_STEP_DONE, HK_STEP_UNDO, HK_STEP_EXPAND, HK_COUNT };
 void loadHotkeys();
 void installKeyHook();
 void removeKeyHook();
@@ -535,6 +532,7 @@ void showStepsOverlay(bool on);
 void stepsOverlayRefresh();
 bool stepsOverlayFixedHeight();  // its height was dragged (else it fits the steps)
 void stepsOverlayFitHeight();
+void stepsOverlayExpand(bool on);  // held hotkey: every step of the zone, back when let go
 void setStepsShown(int n);
 
 // ---------------------------------------------------------------- area_tables_ui.cpp

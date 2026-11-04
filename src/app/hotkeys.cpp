@@ -17,11 +17,13 @@ HotKey gKeys[HK_COUNT] = {
     {L"LayoutScreenshot", 0, 0},
     {L"StepComplete", 0, 0},
     {L"StepUndo", 0, 0},
+    {L"StepExpand", 0, 0},
 };
 
 HHOOK gHook = nullptr;
 int gCapture = -1;  // index of the hotkey being set, -1 = none
 bool gDown[256] = {};
+bool gExpandHeld = false;  // the expand-steps key is down: let go of it ends the expand
 
 bool isModifier(UINT vk) {
     switch (vk) {
@@ -67,10 +69,15 @@ LRESULT CALLBACK keyProc(int code, WPARAM wp, LPARAM lp) {
             if (down && !repeat) PostMessageW(hMain, WM_KEY_CAPTURED, vk, currentMods());
             return 1;
         }
+        if (!down && gExpandHeld && vk == gKeys[HK_STEP_EXPAND].vk) {
+            gExpandHeld = false;
+            PostMessageW(hMain, WM_HOTKEY_ACT, HK_STEP_EXPAND, 1);
+        }
         if (down && !repeat && gCapture < 0) {
             int mods = currentMods();
             for (int i = 0; i < HK_COUNT; ++i)
                 if (gKeys[i].vk && gKeys[i].vk == vk && gKeys[i].mods == mods && targetInFront()) {
+                    if (i == HK_STEP_EXPAND) gExpandHeld = true;
                     PostMessageW(hMain, WM_HOTKEY_ACT, i, 0);
                     break;
                 }
