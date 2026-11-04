@@ -79,6 +79,7 @@ public:
     bool hasCurrent = false;
     Run cur;
     std::string location;  // areaId the player is in now
+    uint32_t locationSeed = 0;  // its instance, from the log (also when no timer runs)
     std::string locationName;  // display name from the loading screen
     std::string sessionStart;  // first timestamp of the log
     uint32_t lastTick = 0;
@@ -188,7 +189,6 @@ private:
     Pending pending = Pending::None;
     bool inSafe = true;
     int nextId = 1;
-    uint32_t locationSeed = 0;
     bool locationLoaded = false;  // the loading screen of `location` is over
 
     // Logout / game restart: where the player was, so returning to the same area can count the time away.

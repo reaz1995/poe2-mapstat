@@ -8,3 +8,7 @@
   the game files, and the quests Blank Runes, Greater Blank Runes, The Forgotten Prisoner and Hostile Takeover
 - New Steps preset: Carry run, the zones and what the carry and the leecher do in each, with the leecher's level
 - README: the showcase video, the old screenshots are gone
+- Layouts: a map screenshot that doesn't overlap the instance's outline yet is no longer left only in "pieces": it
+  becomes its own part of the outline (`<seed>_2.png` and on) and joins the rest when a later screenshot links them
+- Layouts: a layout screenshot taken while the campaign clock is stopped or paused becomes an outline again (it was
+  saved as a plain picture, the instance was taken from the running timer only)
