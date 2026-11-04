@@ -255,10 +255,15 @@ std::vector<std::wstring> listDir(const std::wstring& dir, bool folders) {
     return r;
 }
 
-// Outline pictures are "<seed>.png" (older versions: "<date> seed <seed>.png"); 0 = not an outline.
+// Outline pictures are "<seed>.png", parts of the same map that don't overlap yet "<seed>_2.png", "<seed>_3.png"...
+// (older versions: "<date> seed <seed>.png"); 0 = not an outline.
 uint32_t outlineSeed(const std::wstring& name) {
     if (isGraph(name)) return 0;
     std::wstring stem = name.substr(0, name.find_last_of(L'.'));
+    size_t us = stem.find(L'_');
+    if (us != std::wstring::npos && us + 1 < stem.size() &&
+        std::all_of(stem.begin() + us + 1, stem.end(), iswdigit))
+        stem.resize(us);
     if (!stem.empty() && stem.size() <= 10 && std::all_of(stem.begin(), stem.end(), iswdigit))
         return (uint32_t)wcstoul(stem.c_str(), nullptr, 10);
     size_t at = stem.find(L" seed ");
@@ -271,7 +276,9 @@ bool isImportedOutline(const std::wstring& name) {
            std::all_of(stem.begin() + 8, stem.end(), iswdigit);
 }
 bool isOutline(const std::wstring& name) { return outlineSeed(name) || isImportedOutline(name); }
-std::wstring outlinePath(const std::wstring& dir, uint32_t seed) { return dir + L"\\" + std::to_wstring(seed) + L".png"; }
+std::wstring outlinePath(const std::wstring& dir, uint32_t seed, int n = 0) {  // n: the part, 0 = the largest
+    return dir + L"\\" + std::to_wstring(seed) + (n ? L"_" + std::to_wstring(n + 1) : L"") + L".png";
+}
 
 uint64_t fileTime(const std::wstring& path) {  // last written
     WIN32_FILE_ATTRIBUTE_DATA a;
@@ -556,13 +563,34 @@ long detail(const outline::Outline& o) {
     return n;
 }
 
-// One outline per instance: of pieces that do not overlap (yet), the one showing the most is kept. The others'
-// screenshots stay in "pieces", so they can join it later (Make graph builds the outline from them again).
+// The outline showing the most of an instance (a graph uses one per instance).
 int keepMostDetailed(const std::vector<outline::Outline>& outs) {
     int best = -1;
     for (int i = 0; i < (int)outs.size(); ++i)
         if (!outs[i].empty() && (best < 0 || detail(outs[i]) > detail(outs[best]))) best = i;
     return best;
+}
+
+// Saves the outlines of an instance: the largest as "<seed>.png", parts that don't overlap it yet as "<seed>_2.png"
+// and on, so a later screenshot between them joins them. Files of the instance no longer used are removed. Returns
+// the path outs[want] went to ("" = not saved).
+std::wstring saveInstance(const std::wstring& dir, uint32_t seed, const std::vector<outline::Outline>& outs,
+                          const std::vector<std::wstring>& old, int want) {
+    std::vector<int> live;
+    for (int i = 0; i < (int)outs.size(); ++i)
+        if (!outs[i].empty()) live.push_back(i);
+    std::stable_sort(live.begin(), live.end(), [&](int a, int b) { return detail(outs[a]) > detail(outs[b]); });
+    std::set<std::wstring> used;
+    std::wstring got;
+    for (size_t k = 0; k < live.size(); ++k) {
+        std::wstring path = outlinePath(dir, seed, (int)k);
+        if (!saveOutline(outs[live[k]], path)) continue;
+        used.insert(lowerW(path));
+        if (live[k] == want) got = path;
+    }
+    for (auto& p : old)
+        if (!used.count(lowerW(p))) deleteOutline(p);
+    return got;
 }
 
 std::wstring storeShot(const outline::Image& shot, int gi, const std::wstring& zone, uint32_t seed,
@@ -588,15 +616,11 @@ std::wstring storeShot(const outline::Image& shot, int gi, const std::wstring& z
     std::vector<outline::Outline> outs;
     loadOutlines(dir, seed, paths, outs);
     outline::Added a = outline::add(outs, shot);
-    int keep = keepMostDetailed(outs);
-    if (keep < 0) return L"";
-    const std::wstring path = outlinePath(dir, seed);
-    for (size_t i = 0; i < paths.size(); ++i)  // joined into the kept one, or showing less of the map
-        if (paths[i] != path) deleteOutline(paths[i]);
-    if (!saveOutline(outs[keep], path)) return L"";
+    const std::wstring path = saveInstance(dir, seed, outs, paths, a.into);
+    if (path.empty()) return L"";
     if (outPath) *outPath = path;
-    if (keep != a.into) return L"kept the larger outline (this piece does not overlap it yet)";
-    if (!a.overlapped) return L"new outline";
+    if (!a.overlapped)
+        return paths.empty() ? L"new outline" : L"new part of the outline (it does not overlap the others yet)";
     if (a.overlapped == 1) return L"added to the outline";
     return L"joined " + std::to_wstring(a.overlapped) + L" outlines";
 }
@@ -622,12 +646,12 @@ void shotSaved(const std::wstring& what, int gi, const std::wstring& zone) {
 
 }  // namespace
 
-// Seed of the instance the player is in (0 = unknown, e.g. a sub-area).
+// Seed of the instance the player is in (0 = unknown).
 uint32_t currentSeed() {
     if (g.curZone >= 0 && g.curZone < (int)g.zones.size() && g.zones[g.curZone].areaId == g.location)
         return g.zones[g.curZone].seed;
     if (g.hasCurrent && g.cur.areaId == g.location) return g.cur.seed;
-    return 0;
+    return g.location.empty() ? 0 : g.locationSeed;  // not timed (campaign clock stopped or paused): the log's seed
 }
 
 namespace {
@@ -1279,12 +1303,16 @@ void makeLayoutGraph() {
     std::wstring dir = zoneDir(gSelGroup, gSelZone);
     renameOld(dir);
     std::vector<std::wstring> files;  // outline pictures: "<seed>.png", "imported<n>.png"
+    std::set<std::wstring> runs;  // parts of one instance ("<seed>_2.png") are one run
     for (auto& f : listDir(dir, false))
-        if (isOutline(f)) files.push_back(dir + L"\\" + f);
-    if (files.size() < 2) {
+        if (isOutline(f)) {
+            files.push_back(dir + L"\\" + f);
+            runs.insert(outlineSeed(f) ? std::to_wstring(outlineSeed(f)) : lowerW(f));
+        }
+    if (runs.size() < 2) {
         MessageBoxW(hMain,
                     (L"A graph needs outlines of at least 2 runs of this zone; there " +
-                     std::wstring(files.size() == 1 ? L"is 1." : L"are " + std::to_wstring(files.size()) + L"."))
+                     std::wstring(runs.size() == 1 ? L"is 1." : L"are " + std::to_wstring(runs.size()) + L"."))
                         .c_str(),
                     L"Make graph", MB_ICONINFORMATION);
         return;
@@ -1320,21 +1348,12 @@ void makeLayoutGraph() {
                             outline::add(re, img);
                     }
                     if (!re.empty()) {
-                        for (auto& p : paths) deleteOutline(p);
-                        int keep = keepMostDetailed(re);  // one per instance
-                        if (keep >= 0) saveOutline(re[keep], outlinePath(dir, s));
-                        o.clear();
-                        if (keep >= 0) o.push_back(std::move(re[keep]));
-                        paths.clear();
+                        saveInstance(dir, s, re, paths, -1);
+                        o = std::move(re);
                     }
                 }
-                int keep = keepMostDetailed(o);  // one per instance
-                if (keep >= 0) {
-                    if (o.size() > 1 && paths.size() == o.size())
-                        for (size_t i = 0; i < paths.size(); ++i)
-                            if ((int)i != keep) deleteOutline(paths[i]);
-                    outs.push_back(std::move(o[keep]));
-                }
+                int keep = keepMostDetailed(o);  // the largest part of each instance
+                if (keep >= 0) outs.push_back(std::move(o[keep]));
             }
             for (auto& f : files) {  // outlines made from pictures: each is a run of its own
                 if (!isImportedOutline(f.substr(f.find_last_of(L'\\') + 1))) continue;
