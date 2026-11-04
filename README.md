@@ -45,11 +45,11 @@ moves to the records, orange), back into the same map (the timer continues), the
 
 ## The tabs
 
-| Maps: Session | Maps: Summary | Campaign | Experience |
-|---|---|---|---|
-| ![Maps](docs/general.png) | ![Summary](docs/summary.png) | ![Campaign](docs/campaign.png) | ![Experience](docs/experience.png) |
+| Maps: Summary | Experience |
+|---|---|
+| ![Summary](docs/summary.png) | ![Experience](docs/experience.png) |
 
-*(The screenshots are from an earlier version.)*
+*(These two are from an earlier version; the other tabs have their screenshots in their sections.)*
 
 | Tab | For |
 |---|---|
@@ -70,6 +70,8 @@ saves the list as it is shown.
 Two pills at the top: **Session** (the maps of this session) and **Summary** (one row per map type).
 
 #### Session
+
+![Maps tab, Session: a map paused in the hideout, the maps of the session below](docs/maps-session.png)
 
 The top shows the map you are in (timer, area level, seed, hideout returns, sub-areas); the list under it every map
 of the session with its load time, map time and entries. Right-click the *Map* header to filter: All / Maps / Expedition /
@@ -96,6 +98,8 @@ Two pills at the top: **Session** (the run you are playing) and **Summary** (eve
 
 #### Session
 
+![Campaign tab, Session: the zone you are in with its timer, the act pills and the zones of the act](docs/campaign-session.jpg)
+
 The big timer is the time of the zone you are in; the smaller one under it includes the loading screens. All other
 times leave loading screens out. Right-click the timer for the run's controls:
 
@@ -118,6 +122,8 @@ The hotkeys for Stop, Pause / resume and Start new run are set in Options (none 
 or the app is in front, and the key still reaches the game.
 
 #### Summary
+
+![Campaign tab, Summary: the saved runs with ★ on the best times, a hovered act showing its zones, two runs compared; on the right the overlay with the Time Comparison AddOn](docs/campaign-summary.jpg)
 
 Two lists: **Saved runs** on top and the **Comparison** of the selected runs under it. Hover a list's title for a
 short how-to. *Include loading time* (under the pills) adds the loading screens to every time on this page.
@@ -209,6 +215,10 @@ inside get numbered spots with a legend (`4/4 runs · spots 1, 3, 4`), checkpoin
 `graph.png`, then `graph_1.png` and so on. **A graph is a rough guide, not an exact map:** all outlines of a zone are
 merged into one picture, so when a zone has several quite different layouts their places end up mixed together
 instead of getting a graph per layout.
+
+| A new run, the map overlay still mostly unexplored | Further in: the uncovered map lines up with the graph |
+|---|---|
+| ![The graph overlay showing the zone's graph at the start of a run](docs/graph-overlay.jpg) | ![The uncovered map overlay matching the graph's layout](docs/graph-overlay-map.jpg) |
 
 Acts and zones are named by the zone tables (see [Zone and act names](#zone-and-act-names)). A zone of an act that
 has no name yet is filed under its key (`G5\G5_1`) and moved once the tables name it.
@@ -320,7 +330,7 @@ With the *Experience AddOn* on (Options), these lines appear under the header (n
 
 On a narrow overlay the captions are shorter (`Area:`, `Lvl:`, `Best:`, `Exp:`, `Req:`).
 
-![Timer overlay with the experience lines (level 60 in an area 64)](docs/overlay-exp.png)
+![Timer overlay in a map with the Experience AddOn: a level 12 character in an area 65](docs/overlay-map-exp.jpg)
 
 Timer colours: purple = running, cyan = loading, orange = paused / hideout. Campaign: yellow = paused, red = stopped.
 
@@ -330,13 +340,17 @@ Summary, right-click → Pin) next to it, or with nothing pinned to the best tim
 shows the act you just finished with its difference, e.g. `Act 1: 15:12 (+3m15s)` above `Act 2: 04:10`, and the
 current act's time turns red with its difference once it is slower than the act's time to beat.
 
+| In town: the act just finished, 27 minutes ahead | In a zone: StepsOverlay with its notes, timer with the Experience AddOn |
+|---|---|
+| ![MapTimerOverlay with the previous act's difference, StepsOverlay in town](docs/overlay-town-steps.jpg) | ![StepsOverlay and MapTimerOverlay in Clearfell](docs/overlay-zone-steps.jpg) |
+
 **CommandBarOverlay** - *Hideout* and *Exit* buttons that type `/hideout` or `/exit` into the game chat.
 
 **Graph / outline overlay** - the graphs and outlines of the zone you are in: graphs first (newest first), then the
 outlines. The arrows on the left and right page through them; the counter at the bottom says which one is shown
 (`2/5 · outline`). After a layout screenshot it shows that instance's outline as it is now. With *Only graphs*
 (Options) it shows graphs only. Double-click opens the picture in the Windows photo viewer. On its first start it is
-placed under the MapTimerOverlay.
+placed under the MapTimerOverlay. Pictures: [Layouts → Graphs](#layouts).
 
 **StepsOverlay** - the steps of the zone you are in (Steps tab): the last one done (green) and the next ones to do,
 as many as set in Options, each with its details in small print; optional steps are a shade darker. The zone and
