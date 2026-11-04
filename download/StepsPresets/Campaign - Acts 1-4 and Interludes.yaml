@@ -4,27 +4,37 @@
 # League content (Expedition runestones, Incursion beacons, Abyss) is left out.
 # "+ Act N" ... "+": a section, double-click it in the editor to fold / unfold.
 # Quest: the quest the step completes.
+# "From -> Zone": the steps when you come from that zone (a town visit after a boss, a zone you come back to);
+# from anywhere else the plain steps of the zone are shown. Towns have a vendor search regex in their notes.
 
 + Act 1
 The Riverbank
   Kill The Bloated Miller
   Go to Clearfell Encampment
 
-Clearfell Encampment
+The Riverbank -> Clearfell Encampment
   Talk to Renly
     Quest: Reaching Clearfell
-    Reward: Uncut Skill Gem
+    Reward: Uncut Skill Gem (level 1)
+  Go to Clearfell
+
+Clearfell Encampment
+  Sell, then waypoint back to where you were
+  Notes
+    Vendor search: movement speed, +level of all spell skills, +maximum life
+      "ovement sp|of all spell|maximum li"
 
 Clearfell
   (op) Beira of the Rotten Pack
     Boss
+    Reward: Head of the Winter Wolf (+10% cold resistance)
   (op) Find the Mud Burrow
   Find The Grelwood
 
 Mud Burrow
   (op) Kill The Devourer
     Quest: Treacherous Ground
-    Reward from Renly: Uncut Support Gem
+    Reward from Renly: Uncut Support Gem (level 1)
 
 The Grelwood
   (op) The Brambleghast
@@ -37,17 +47,16 @@ The Red Vale
   Kill The Rust King (guards the last rune)
   Back to town
 
-Clearfell Encampment
+The Red Vale -> Clearfell Encampment
   Give the runes to Renly, take the Rune Spikes
+  Talk to Una
+  Waypoint to The Grelwood
 
-The Grelwood
+Clearfell Encampment -> The Grelwood
   Stab the 3 Rune Spikes into the Tree of Souls
     Quest: Secrets in the Dark
     The Hooded One is released
   Find The Grim Tangle
-
-Clearfell Encampment
-  Talk to Una
 
 The Grim Tangle
   Summon Una to clear the roots
@@ -70,25 +79,30 @@ Cemetery of the Eternals
   Open the Memorial Gate, follow Lachlann
   Kill Lachlann of Endless Lament
     Quest: Sorrow Among Stones
-    Reward: Uncut Support Gem, Count Lachlann's ring
-  Go to Hunting Grounds
+    Reward: Uncut Support Gem (level 1), Count Lachlann's ring
+  Go to Hunting Grounds (or town first for the ring)
 
-Clearfell Encampment
+Cemetery of the Eternals -> Clearfell Encampment
   Give the ring to Una, watch the Hooded One revive
     Quest: The Mysterious Shade
+  Waypoint to Cemetery of the Eternals, go to Hunting Grounds
 
 Hunting Grounds
   (op) Talk to Delwyn, follow the Spirit, kill the Hunted Monster
     Quest: The Hunt Begins
   (op) The Crowbell
     Boss
+    Reward: Book of Specialisation (2 weapon set passive points)
   (op) Find Freythorn
   Find Ogham Farmlands
 
 Freythorn
   (op) Cleanse the Ritual Altars, kill the King in the Mists
     Quest: Ominous Altars
+    Boss: The King in the Mists
+    Reward: Gembloom Skull (+30 spirit) + Uncut Spirit Gem (level 4)
     Reward from Finn: Ruby, Sapphire or Topaz Charm
+    Reward: Vagrant's Brew (+10 maximum life)
 
 Ogham Farmlands
   (op) Find Una's lute in her home
@@ -100,9 +114,12 @@ Ogham Village
   (op) Find Renly's tools
     Quest: Finding the Forge
     Reward: Renly's salvage bench
+  (op) Talk to Renly at the forge
+    Quest: Blank Runes
+    Reward from Renly: Lesser Desert, Glacial, Iron or Storm Rune
   Kill The Executioner, free Leitis
     Quest: The Trail of Corruption
-    Reward: Uncut Skill Gem
+    Reward: Uncut Skill Gem (level 5)
   Go to The Manor Ramparts
 
 The Manor Ramparts
@@ -110,10 +127,15 @@ The Manor Ramparts
 
 Ogham Manor
   Kill Candlemass, the Living Rite
+    Reward: Candlemass' Essence (+20 maximum life)
   Kill Count Geonor in the pit below the Manor
     Quest: The Mad Wolf of Ogham
-    Reward: Uncut Support Gem
-  Talk to the Hooded One in town, travel to Vastiri Outskirts
+    Reward: Uncut Support Gem (level 1)
+  Back to town
+
+Ogham Manor -> Clearfell Encampment
+  (op) Give Count Lachlann's ring to Una if you still have it
+  Talk to the Hooded One: travel to Vastiri Outskirts
 +
 
 + Act 2
@@ -121,16 +143,21 @@ Vastiri Outskirts
   Kill the Sun Clan hyenas and Rathbreaker
   Talk to Zarka
     Quest: Earning Passage
-    Reward: Uncut Skill Gem
+    Reward: Uncut Skill Gem (level 5)
   Enter The Ardura Caravan
 
-The Ardura Caravan
+Vastiri Outskirts -> The Ardura Caravan
   Talk to the Hooded One, Sekhema Asala
   Use the Desert Map: Mawdun Quarry
+
+The Ardura Caravan
+  Sell, then the Desert Map back to where you were
   Notes
     Desert Map: travel between the areas of the act
-    (op) Ancient Vows: find the Sun Clan and Kabala Clan Relics, put both in the altar
-      pick a permanent reward from one clan
+    (op) Ancient Vows: Sun Clan and Kabala Clan Relics into the altar
+      Reward: Medallion of the Serpent or Hyena (+1 charm slot, +30% charm charges or duration)
+    Vendor search: movement speed, +level of all spell skills, +maximum life
+      "ovement sp|of all spell|maximum li"
 
 Mawdun Quarry
   Go to Mawdun Mine
@@ -140,28 +167,30 @@ Mawdun Mine
   Question the Faridun defector (Risu)
   Back to town, talk to Asala
 
-The Ardura Caravan
-  Talk to Risu about the locked Halani Gates, then Asala
+Mawdun Mine -> The Ardura Caravan
+  Talk to Asala, then Risu about the locked Halani Gates
   Desert Map: Traitor's Passage
 
 Traitor's Passage
   Kill Balbala, the Traitor
-    Reward: Balbala's Barya (Trial of the Sekhemas)
+    Quest: The Forgotten Prisoner
+    Reward: Balbala's Barya (Trial of the Sekhemas, first Ascendancy)
   Go to The Halani Gates
 
 The Halani Gates
   Help Asala open the 3 gate mechanisms
   Kill Jamanra, the Risen King
-  The sandstorm blocks the way: talk to Zarka
+  The sandstorm blocks the way: back to the caravan
 
-The Ardura Caravan
+The Halani Gates -> The Ardura Caravan
   Talk to Zarka and Asala: the Horn of the Vastiri
-  Notes
-    Horn of the Vastiri: Essence of Water (Keth), Mastodon Tusks (Bone Pits), Flame Ruby (Titan Grotto)
+    Essence of Water (Keth), Mastodon Tusks (Bone Pits), Flame Ruby (Titan Grotto)
+  Desert Map: Keth, Mastodon Badlands or Valley of the Titans
 
 Keth
   (op) Kabala, Constrictor Queen
     Boss
+    Reward: Book of Specialisation (2 weapon set passive points)
   Go to The Lost City
 
 The Lost City
@@ -172,7 +201,12 @@ Buried Shrines
   Burn the Water Goddess with the Everburning Cinders
   Pick up the Essence of Water
     Quest: The City of Seven Waters
-    Reward from Zarka: Uncut Support Gem
+    Reward from Zarka: Uncut Support Gem (level 2)
+  Back to the caravan
+
+Buried Shrines -> The Ardura Caravan
+  Give the Essence of Water to Zarka
+  Desert Map: the next part of the Horn (Tusks or Flame Ruby)
 
 Mastodon Badlands
   Find The Bone Pits
@@ -183,7 +217,12 @@ The Bone Pits
   Kill Ekbab, Ancient Steed and Iktab, the Deathlord
   Pick up the Mastodon Tusks
     Quest: A Theft of Ivory
-    Reward from Zarka: Uncut Support Gem
+    Reward from Zarka: Uncut Support Gem (level 2)
+  Back to the caravan
+
+The Bone Pits -> The Ardura Caravan
+  Give the Mastodon Tusks to Zarka
+  Desert Map: the next part of the Horn (Essence or Flame Ruby)
 
 Valley of the Titans
   Activate the Ancient Seals
@@ -193,11 +232,16 @@ The Titan Grotto
   Invoke the Rite of Flame at the cerulean altar
   Kill Zalmarath, the Colossus, pick up the Flame Ruby
     Quest: A Crown of Stone
-    Reward from Zarka: Uncut Support Gem
+    Reward from Zarka: Uncut Support Gem (level 2)
+  Back to the caravan
+
+The Titan Grotto -> The Ardura Caravan
+  Give the Flame Ruby to Zarka
+  Desert Map: the next part of the Horn (Essence or Tusks)
 
 The Ardura Caravan
-  Take the Horn of the Vastiri from Zarka
-    Reward: Uncut Skill Gem
+  With all 3 parts: take the Horn of the Vastiri from Zarka
+    Reward: Uncut Skill Gem (level 7)
   Desert Map: the sandstorm, sound the Horn
   Desert Map: Deshar
 
@@ -218,9 +262,12 @@ Path of Mourning
 
 The Spires of Deshar
   Kill Tor Gul, the Defiler
+  (op) Pray at the Shrine of the Sisters of Garukhan
+    Reward: +10% lightning resistance
   Back to town, talk to Asala
 
-The Ardura Caravan
+The Spires of Deshar -> The Ardura Caravan
+  Talk to Asala
   Desert Map: Dreadnought
 
 The Dreadnought's Wake
@@ -230,7 +277,10 @@ Dreadnought
   Fight to the cage behind the throne
   Kill Jamanra, the Abomination
     Quest: The Trail of Corruption
-  Back to town: the Hooded One's shrine (north-west, on foot)
+  Back to the caravan
+
+Dreadnought -> The Ardura Caravan
+  The Hooded One's shrine (north-west, on foot)
   Talk to Asala: travel to Sandswept Marsh
 +
 
@@ -240,13 +290,20 @@ Sandswept Marsh
     Boss
   Find the treasure hunters' camp on the ziggurat
 
-Ziggurat Encampment
+Sandswept Marsh -> Ziggurat Encampment
   Talk to the Hooded One
   Go to Jungle Ruins
+
+Ziggurat Encampment
+  Sell, then waypoint back to where you were
+  Notes
+    Vendor search: movement speed, +level of all spell skills, +maximum life
+      "ovement sp|of all spell|maximum li"
 
 Jungle Ruins
   (op) Mighty Silverfist
     Boss
+    Reward: Book of Specialisation (2 weapon set passive points)
   (op) Find The Venom Crypts
   Find the stone altar, summon Alva
   Go to Infested Barrens
@@ -263,6 +320,7 @@ Infested Barrens
 
 Chimeral Wetlands
   Kill Xyclucian, the Chimera (guards the Machinarium)
+    Reward: Chimeral Inscribed Ultimatum (Trial of Chaos, second Ascendancy)
   (op) The Temple of Chaos: Trial of Chaos with an Inscribed Ultimatum
     Quest: The Trials of Chaos
     Reward: 2 Ascendancy points
@@ -271,6 +329,7 @@ Chimeral Wetlands
 Jiquani's Machinarium
   Find a small Soul Core, open the stone door
   Kill Blackjaw, the Remnant
+    Reward: Flame Core (+10% fire resistance)
   Go to Jiquani's Sanctum
 
 Jiquani's Sanctum
@@ -286,11 +345,15 @@ Jungle Ruins
 The Matlan Waterways
   Drain the area with the control mechanisms
   (op) Find The Azak Bog
-  Back to town, take the south-west stairs down
+  Back to town
+
+The Matlan Waterways -> Ziggurat Encampment
+  Take the south-west stairs down to The Drowned City
 
 The Azak Bog
   (op) Kill Ignagduk, the Bog Witch, pick up her Ghastly Spear
     Quest: Tribal Vengeance
+    Reward: Gemrot Skull (+30 spirit)
     Reward from Servi: Thawing, Staunching, Antidote, Dousing or Grounding Charm
 
 The Drowned City
@@ -300,13 +363,14 @@ The Drowned City
 The Molten Vault
   (op) Kill Mektul, the Forgemaster, pick up the Hammer of Kamasa
     Quest: Treasures of Utzaal
-    Reward from Oswald: Uncut Skill Gem, Artificer's Orb, Reforging Bench
+    Reward from Oswald: Uncut Skill Gem (level 10), Artificer's Orb, Reforging Bench
 
 Apex of Filth
   Kill The Queen of Filth
   Pick up the Temple Door Idol
+  Back to town
 
-Ziggurat Encampment
+Apex of Filth -> Ziggurat Encampment
   Show the Idol to Alva, open the Temple of Kopec
 
 Temple of Kopec
@@ -319,28 +383,43 @@ Utzaal
   Go to Aggorat
 
 Aggorat
+  (op) Kill the Vaal Goliath, take the Sacrificial Heart to the altar
+    Reward: 2 weapon set passive points
   Find The Black Chambers
 
 The Black Chambers
   Kill Doryani's Triumph
   Capture Doryani, Royal Thaumaturge
+  Back to town
 
-Ziggurat Encampment
+The Black Chambers -> Ziggurat Encampment
   Talk to Doryani
   Gateway to the Past: survive the Cataclysm, back to the Present
   Talk to Alva: travel to Kingsmarch
     Quest: Legacy of the Vaal
+    Penalty: -30% elemental resistances
 +
 
 + Act 4
-Kingsmarch
+Ziggurat Encampment -> Kingsmarch
   Talk to Doryani, then Alva
   Take the Boat Charter from Rog, show it to Makoru
   Sail to Kedge Bay
+
+Kingsmarch
+  Sell, then sail with Makoru to the next island
+  (op) Clear the Shoreline, talk to Ange in the Shoreline Hideout
+    Quest: Hostile Takeover
+    Reward: the Shoreline Hideout
+  (op) With Verisium from Dannig
+    Quest: Greater Blank Runes
+    Reward: Greater Body, Desert, Glacial, Iron, Mind or Storm Rune
   Notes
     Makoru sails to any island, do them in any order
     Weapon pieces: Singing Caverns, Shrike Island, Solitary Confinement
     Torn Map Pieces: bring all 4 to Makoru (or Dannig) for Plunder's Point
+    Vendor search: movement speed, +level of all spell skills, +maximum life
+      "ovement sp|of all spell|maximum li"
 
 Kedge Bay
   (op) Abandoned Ship
@@ -356,10 +435,15 @@ Journey's End
   The Captain's Chair
     Boss: Captain Hartlin
     Reward: Verisium Ingots - take them to Dannig in Kingsmarch
-  (op) Free Freya Hartlin with the Verisium Spikes from Dannig
+  Back to Kingsmarch
+  (op) Back here: free Freya Hartlin with the Verisium Spikes from Dannig
     Quest: Dark Mists
     Boss: Omniphobia, Fear Manifest
-    Reward from Tujen: Mist-shrouded Tome + Uncut Skill Gem
+    Reward from Tujen: Mist-shrouded Tome + Uncut Skill Gem (level 13)
+
+Journey's End -> Kingsmarch
+  Give the Verisium Ingots to Dannig, take the Verisium Spikes
+  Sail back to free Freya, or on to Whakapanu Island
 
 Whakapanu Island
   (op) Abandoned Homes
@@ -384,7 +468,7 @@ Singing Caverns
   Chamber of Echoes
     Quest: Whakapanu Island
     Boss: Diamora, Song of Death
-    Reward: Weapon Piece + Uncut Skill Gem
+    Reward: Weapon Piece + Uncut Skill Gem (level 12)
   Talk to Matiki (freed by the Siren's death)
 
 Shrike Island
@@ -397,14 +481,14 @@ Shrike Island
   Corrupted Nests
     Quest: Shrike Island
     Boss: Scourge of the Skies
-    Reward: Weapon Piece + Uncut Skill Gem
+    Reward: Weapon Piece + Uncut Skill Gem (level 12)
     Reward: Ruby, Sapphire, Topaz or Amethyst Ring
 
 Abandoned Prison
   (op) Riot Armaments
     Weapons
-  The Chapel
-    Reward: life / mana flask recovery
+  The Chapel: Goddess of Justice
+    Reward: +30% life or mana flask recovery
   (op) Forgotten Cells
     Gemcutter's Prism maybe?
   Go to Solitary Confinement
@@ -414,7 +498,7 @@ Solitary Confinement
     Chests
   Open the Fortified Door, kill The Prisoner (use a Ballista)
     Quest: Abandoned Prison
-    Reward: Weapon Piece + Uncut Skill Gem
+    Reward: Weapon Piece + Uncut Skill Gem (level 12)
     Reward: Amber, Jade or Lapis Amulet
 
 Isle of Kin
@@ -429,7 +513,8 @@ Isle of Kin
   Primal Arena
     Quest: The Blind Beast
     Boss: The Blind Beast
-    Reward: 2 skill points, Sulphite Potion + Uncut Skill Gem
+    Reward: 2 skill points, Sulphite Potion + Uncut Skill Gem (level 12)
+    Reward: drink the Sulphite Potion (+10% lightning resistance)
   Go to Volcanic Warrens
 
 Volcanic Warrens
@@ -444,7 +529,7 @@ Volcanic Warrens
 Eye of Hinekora
   Talk to Matiki, peer into the Well of Passing
   Tests of Mettle: Kaom, Maata, Rakiata
-    Reward: 5% mana
+    Reward: Navali's Rest (+5% maximum mana)
   Find the Halls of the Dead
 
 Halls of the Dead
@@ -458,7 +543,8 @@ Halls of the Dead
     Quest: Ngamahu's Test
     Reward: Strength or Fire Tattoo of Ngamahu
   Yama's Test
-    Boss: Yama the White - pick up the Silver Coin
+    Boss: Yama The White - pick up the Silver Coin
+    Reward: Book of Specialisation (2 weapon set passive points)
   Enter the portal to meet the Mother
 
 Trial of the Ancestors
@@ -484,7 +570,11 @@ The Excavation
     Loot
   The Precursor Forge
     Boss: Benedictus, First Herald of Utopia
-  Back to Kingsmarch: the Hooded One reforges the Weapon
+  Back to Kingsmarch
+
+The Excavation -> Kingsmarch
+  The Hooded One reforges the Weapon
+  Sail to Ngakanu
 
 Ngakanu
   Talk to Rhodri, find the Heart of the Tribe
@@ -493,7 +583,11 @@ Heart of the Tribe
   Find Tavakai
     Quest: The Search
     Boss: Tavakai
-  Back to Kingsmarch, talk to the Hooded One
+  Back to Kingsmarch
+
+Heart of the Tribe -> Kingsmarch
+  Talk to the Hooded One: the Interludes
+  (op) With all 4 Torn Map Pieces: sail to Plunder's Point
 
 Plunder's Point
   (op) Place the Explosives (needs all 4 Torn Map Pieces)
@@ -509,6 +603,10 @@ Kingsmarch
 
 The Refuge
   Talk to Renly
+  Go to Scorched Farmlands
+  Notes
+    Vendor search: movement speed, +level of all spell skills, +maximum life
+      "ovement sp|of all spell|maximum li"
 
 Scorched Farmlands
   Kill Isolde of the White Shroud and Heldra of the Black Pyre
@@ -519,7 +617,10 @@ Stones of Serle
   Activate the Runed Megaliths
   Kill Siora, Blade of the Mists
   Talk to Una
-  Back to the Darkness in Scorched Farmlands
+  Back to Scorched Farmlands
+
+Stones of Serle -> Scorched Farmlands
+  Enter the Darkness: The Blackwood
 
 The Blackwood
   Find Holten
@@ -532,21 +633,32 @@ Holten
 Wolvenhold
   (op) Oswin, the Dread Warden
     Boss
+    Reward: Warden's Ledger (2 weapon set passive points)
 
 Holten Estate
   Kill Thane Wulfric and Lady Elswyth
     Quest: Recruit the Ezomytes
-  Back to Renly
+  Back to The Refuge
+
+Holten Estate -> The Refuge
+  Talk to Renly
+  Back to Kingsmarch: the next Interlude
 
 # ---- Recruit the Maraketh
 
 The Khari Bazaar
   Talk to Asala, then Zarka
+  Go to The Khari Crossing
+  Notes
+    Vendor search: movement speed, +level of all spell skills, +maximum life
+      "ovement sp|of all spell|maximum li"
 
 The Khari Crossing
   (op) Kill Akthi, the Final Sting and Anundr, the Sandworm
     Quest: Clearing the Way
     Reward from Risu: Book of Specialisation
+  (op) Skullmaw Stairway: the Molten Shrine
+    Reward: Molten One's Gift (+5% maximum life)
   Ascend the tower of Ab Binayi, follow the Wayfinders
   Go to Pools of Khatal
 
@@ -555,7 +667,10 @@ Pools of Khatal
 
 Sel Khari Sanctuary
   Kill Elzarah, the Cobra Lord
-  Back to The Khari Crossing, find The Galai Gates
+  Back to The Khari Crossing
+
+Sel Khari Sanctuary -> The Khari Crossing
+  Find The Galai Gates
 
 The Galai Gates
   Kill Vornas, the Fell Flame
@@ -563,23 +678,33 @@ The Galai Gates
 
 Qimah
   Find the Ceremony Site, summon Jado
+  (op) The Seven Pillars: Orbala's Pillar
+    Reward: pick 1 boon, can be changed later
+      5% all resistances, 3% movement speed, 15% armour/evasion/energy shield,
+      20% presence area, 12% cooldown speed, +5 all attributes, or 5% experience
   Go to Qimah Reservoir
 
 Qimah Reservoir
   Kill Azmadi, the Faridun Prince
   Use the Grand Barya
     Quest: Recruit the Maraketh
+  Back to Kingsmarch: the next Interlude
 
 # ---- Recruit the Vaal
 
 The Glade
   Talk to Doryani
+  Go to Ashen Forest
+  Notes
+    Vendor search: movement speed, +level of all spell skills, +maximum life
+      "ovement sp|of all spell|maximum li"
 
 Ashen Forest
   Go to Kriar Village
 
 Kriar Village
   Kill Lythara, the Wayward Spear
+    Reward: Gemcrust Skull (+40 spirit) + Uncut Spirit Gem (level 14)
   Go to Glacial Tarn
 
 Glacial Tarn
@@ -603,6 +728,7 @@ The Cuachic Vault
   Kill Zolin, Blood Priest and Zelina, Blood Priestess
     Quest: Recruit the Vaal
   Summon Doryani
+  Back to Kingsmarch
 
 # ---- Siege of Oriath
 

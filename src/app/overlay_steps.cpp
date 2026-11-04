@@ -15,6 +15,7 @@ namespace {
 
 const wchar_t* kSec = L"StepsOverlay";
 const int kPad = 8;
+const int kArrowW = 12;  // a gutter right of the steps for the "more steps" arrow
 
 struct Row {
     int step;
@@ -25,6 +26,7 @@ std::vector<Row> gRows;  // from the last layout
 std::vector<steps::Note> gNotes;
 std::vector<RECT> gNoteRects;
 int gSepY = -1;  // the line between steps and notes
+bool gExpand = false;  // the expand hotkey is held: every step of the zone, the window as tall as they need
 // Every line (step, detail, note) can be copied: hovered it is underlined, a click copies it (with click-through on:
 // Alt + click), e.g. a regex to paste into the game's search.
 struct Hit {
@@ -67,7 +69,7 @@ void copyLine(HWND h, int i) {
     InvalidateRect(h, nullptr, FALSE);
 }
 
-int gMinH = 0;   // header + notes footer: the window is never smaller, so both always show in full
+int gMinH = 0;   // header, first step, notes footer: the window is never smaller, so all three always show in full
 
 HFONT rowFont() { return fOvSmall ? fOvSmall : fNormal; }
 HFONT headFont() { return fOvSmall ? fOvSmall : fBold; }
@@ -92,7 +94,7 @@ int layoutRows(HDC dc, int width) {
     gNoteRects.clear();
     gSepY = -1;
     auto list = stepsCurrent(nullptr);
-    auto show = steps::shown(stepsAll(), list, stepsProgress().done, gStepsShown);
+    auto show = gExpand ? list : steps::shown(stepsAll(), list, stepsProgress().done, gStepsShown);
     gNotes = gStepsNotes ? stepsNotes() : std::vector<steps::Note>();
     TEXTMETRICW tm, sm;
     SelectObject(dc, subFont());
@@ -104,7 +106,7 @@ int layoutRows(HDC dc, int width) {
     int footTop = -1;
     SelectObject(dc, rowFont());
     GetTextMetricsW(dc, &tm);
-    const int right = width - kPad;
+    const int right = width - kPad - kArrowW;
     for (int i : show) {
         const steps::Step& st = stepsAll()[i];
         Row row{i, {}, {}};
@@ -127,13 +129,16 @@ int layoutRows(HDC dc, int width) {
         for (const steps::Note& n : gNotes) {
             SelectObject(dc, n.sub ? subFont() : rowFont());
             int x = kPad + (n.sub ? kSubIndent : 0);
-            gNoteRects.push_back(measure(dc, W(n.text), x, y + (n.sub ? 1 : 0), right, n.sub ? sm.tmHeight : tm.tmHeight));
+            gNoteRects.push_back(measure(dc, W(n.text), x, y + (n.sub ? 1 : 0), right + kArrowW, n.sub ? sm.tmHeight : tm.tmHeight));
             y = gNoteRects.back().bottom + (n.sub ? 0 : 2);
         }
         y += 4;
     }
     int h = y + kPad - 4;
-    gMinH = headH + (footTop >= 0 ? h - footTop : kPad);
+    // the first step (with its details) or the "no steps" line always fits
+    int firstH = gRows.empty() ? tm.tmHeight + 4
+                               : (gRows[0].sub.empty() ? gRows[0].text.bottom : gRows[0].sub.back().bottom) - headH + 4;
+    gMinH = headH + firstH + (footTop >= 0 ? h - footTop : kPad);
     return h;
 }
 
@@ -189,8 +194,10 @@ void paint(HDC dc, RECT rc) {
             DrawTextW(dc, stepsAll().empty() ? L"Write steps in the Steps tab" : L"No steps for this zone", -1, &r,
                       DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
     }
+    const Row* lastDrawn = nullptr;
     for (const Row& r : gRows) {
         if (r.text.bottom > limit) break;
+        lastDrawn = &r;
         const steps::Step& st = stepsAll()[r.step];
         bool on = stepsProgress().isDone(st);
         COLORREF c = on ? C::Green : C::Fg;
@@ -201,6 +208,31 @@ void paint(HDC dc, RECT rc) {
             bool reward = steps::lower(st.sub[k].substr(0, 6)) == "reward";
             COLORREF c = reward ? mix(mix(C::Yellow, C::Orange, 60), C::Darkest, 72) : C::Comment;
             draw(subFont(), st.optional ? mix(c, C::Darkest, 70) : c, st.sub[k], r.sub[k]);
+        }
+    }
+    // A small arrow right of the last step drawn when steps still to do come after it (left out by the count or
+    // the height); none when nothing is hidden.
+    if (lastDrawn) {
+        bool more = false;
+        bool after = false;
+        for (int i : list) {
+            if (after && !stepsProgress().isDone(stepsAll()[i])) { more = true; break; }
+            if (i == lastDrawn->step) after = true;
+        }
+        if (more) {
+            int bottom = lastDrawn->text.bottom;
+            for (size_t k = 0; k < lastDrawn->sub.size(); ++k)
+                if (lastDrawn->sub[k].bottom <= limit) bottom = lastDrawn->sub[k].bottom;
+            int cx = rc.right - kPad - kArrowW / 2 + 1, cy = bottom - 6;
+            POINT tri[3] = {{cx - 4, cy - 2}, {cx + 4, cy - 2}, {cx, cy + 3}};
+            HBRUSH br = CreateSolidBrush(C::Comment);
+            HPEN pen = CreatePen(PS_SOLID, 1, C::Comment);
+            HGDIOBJ ob = SelectObject(dc, br), op = SelectObject(dc, pen);
+            Polygon(dc, tri, 3);
+            SelectObject(dc, ob);
+            SelectObject(dc, op);
+            DeleteObject(br);
+            DeleteObject(pen);
         }
     }
     if (gSepY >= headBottom) {
@@ -227,7 +259,15 @@ void fitHeight() {
     HDC dc = GetDC(hStepsOv);
     int h = layoutRows(dc, rc.right);
     ReleaseDC(hStepsOv, dc);
-    if (gFixedH > 0) h = std::max(gFixedH, gMinH);
+    if (gFixedH > 0 && !gExpand) h = std::max(gFixedH, gMinH);
+    if (gExpand) {  // no further than the bottom of its screen
+        RECT wr;
+        GetWindowRect(hStepsOv, &wr);
+        MONITORINFO mi = {};
+        mi.cbSize = sizeof(mi);
+        if (GetMonitorInfoW(MonitorFromWindow(hStepsOv, MONITOR_DEFAULTTONEAREST), &mi))
+            h = std::min(h, (int)(mi.rcWork.bottom - wr.top) - (int)(wr.bottom - wr.top - rc.bottom));
+    }
     if (h != rc.bottom) SetWindowPos(hStepsOv, nullptr, 0, 0, rc.right, h, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
@@ -384,6 +424,12 @@ LRESULT CALLBACK StepsProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
 }
 
 }  // namespace
+
+void stepsOverlayExpand(bool on) {
+    if (gExpand == on || !hStepsOv) return;
+    gExpand = on;
+    stepsOverlayRefresh();
+}
 
 bool stepsOverlayFixedHeight() { return gFixedH > 0; }
 void stepsOverlayFitHeight() {

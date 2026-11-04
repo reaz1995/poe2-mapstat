@@ -27,10 +27,6 @@ public:
     bool add(const std::string& key, const std::string& name = "unknown");
     // known names of `newer` fill the "unknown" ones here, its keys missing here are added
     bool mergeFrom(const AreaTable& newer);
-    // the known names of `other` replace the ones here (loaded from a file), its keys missing here are added;
-    // how many names changed or were added
-    int takeNames(const AreaTable& other);
-    bool isActTable() const;  // every key is an act key (G1, C_G2, P1): acts.txt, else zones.txt
     const std::vector<Entry>& entries() const { return m_e; }
 
 private:

@@ -264,6 +264,13 @@ uint32_t outlineSeed(const std::wstring& name) {
     size_t at = stem.find(L" seed ");
     return at == std::wstring::npos ? 0 : (uint32_t)wcstoul(stem.c_str() + at + 6, nullptr, 10);
 }
+// Outlines made from a picture (no seed known): "imported0.png", "imported1.png" ...
+bool isImportedOutline(const std::wstring& name) {
+    std::wstring stem = lowerW(name.substr(0, name.find_last_of(L'.')));
+    return stem.size() > 8 && stem.compare(0, 8, L"imported") == 0 &&
+           std::all_of(stem.begin() + 8, stem.end(), iswdigit);
+}
+bool isOutline(const std::wstring& name) { return outlineSeed(name) || isImportedOutline(name); }
 std::wstring outlinePath(const std::wstring& dir, uint32_t seed) { return dir + L"\\" + std::to_wstring(seed) + L".png"; }
 
 uint64_t fileTime(const std::wstring& path) {  // last written
@@ -639,6 +646,7 @@ struct ShotDone {
     int used = 0, runs = 0;
     std::wstring outline;  // the outline picture the screenshot went into
     uint32_t seed = 0;
+    std::wstring error;  // shown in a message box instead (Make outline from a picture)
 };
 
 void storeAsync(HBITMAP hb, int gi, const std::wstring& zone, uint32_t seed) {
@@ -650,8 +658,57 @@ void storeAsync(HBITMAP hb, int gi, const std::wstring& zone, uint32_t seed) {
     }
     std::thread([shot = std::move(shot), gi, zone, seed] {
         std::wstring path;
-        auto* r = new ShotDone{storeShot(shot, gi, zone, seed, &path), zone, gi, false, 0, 0, {}, 0};
+        auto* r = new ShotDone{storeShot(shot, gi, zone, seed, &path), zone, gi, false, 0, 0, {}, 0, {}};
         r->outline = path, r->seed = seed;
+        if (!PostMessageW(hMain, WM_LAYOUT_DONE, 0, (LPARAM)r)) delete r;
+    }).detach();
+}
+
+// A picture of the map overlay (a screenshot taken another way, a picture someone shared): its outline, made from
+// that one picture as it is. It is never joined with other pieces or moved, so what the picture does not show stays
+// empty. With no seed known it is named "imported0.png", "imported1.png" ...; its points file notes which picture it
+// came from, so the same picture is not made twice.
+void outlineFromPicture(const std::wstring& file, int gi, const std::wstring& zone) {
+    std::thread([file, gi, zone] {
+        gdipInit();
+        auto* r = new ShotDone{L"", zone, gi, false, 0, 0, {}, 0, {}};
+        outline::Image img;
+        if (!withPicture(file, [&](Gdiplus::Bitmap& b) { return toImage(b, img); }) || img.empty()) {
+            r->error = L"The picture could not be read.";
+        } else {
+            outline::Mask e = outline::edges(img);
+            if (std::count(e.m.begin(), e.m.end(), 1) < 300) {
+                r->error = L"No map outline found in the picture. It needs the in-game map overlay (Tab) with its "
+                           L"light blue walls.";
+            } else {
+                uint32_t h = 2166136261u;  // FNV-1a of the pixels
+                for (uint8_t v : img.px) h = (h ^ v) * 16777619u;
+                char tag[48];
+                snprintf(tag, sizeof tag, "# picture %08x\n", h);
+                std::lock_guard<std::mutex> lock(gOutlineBusy);
+                makeDirs(gi, zone);
+                std::wstring dir = zoneDir(gi, zone), same;
+                std::set<std::wstring> taken;
+                for (auto& f : listDir(dir, false))
+                    if (isImportedOutline(f)) {
+                        taken.insert(lowerW(f));
+                        if (readText(sidecarFound(dir + L"\\" + f)).find(tag) != std::string::npos) same = f;
+                    }
+                if (!same.empty()) {
+                    r->error = L"This picture's outline is there already: " + same;
+                } else {
+                    int n = 0;
+                    while (taken.count(L"imported" + std::to_wstring(n) + L".png")) ++n;
+                    std::wstring path = dir + L"\\imported" + std::to_wstring(n) + L".png";
+                    outline::Outline o = outline::render(img);
+                    makeParent(sidecarOf(path));
+                    if (savePng(o.img, path) && writeText(sidecarOf(path), outline::saveLabels(o.labels) + tag))
+                        r->what = L"outline made from a picture", r->outline = path;
+                    else
+                        r->error = L"The outline could not be saved.";
+                }
+            }
+        }
         if (!PostMessageW(hMain, WM_LAYOUT_DONE, 0, (LPARAM)r)) delete r;
     }).detach();
 }
@@ -776,11 +833,14 @@ void deleteShot(int i) {  // to the Recycle Bin
 void menuShot(int i) {
     if (i < 0 || i >= (int)gShots.size()) return;
     std::wstring path = gShots[i].path;
+    std::wstring name = fileName(path);
+    bool plain = !isOutline(name) && !isGraph(name);  // a picture that is not an outline or a graph yet
     gMenuItems.clear();
-    gMenuItems.reserve(5);
+    gMenuItems.reserve(6);
     gMenuItems.push_back({L"Open", false});
     gMenuItems.push_back({L"Show in folder", false});
     gMenuItems.push_back({L"Rename", false});
+    gMenuItems.push_back({L"Make outline from this picture", false});
     gMenuItems.push_back({L"", true});
     gMenuItems.push_back({L"Delete (to Recycle Bin)", false});
     HMENU m = CreatePopupMenu();
@@ -789,9 +849,11 @@ void menuShot(int i) {
     mi.fMask = MIM_BACKGROUND;
     mi.hbrBack = brCard;
     SetMenuInfo(m, &mi);
-    const int ids[] = {1, 2, 4, 0, 3};
-    for (int k = 0; k < 5; ++k)
+    const int ids[] = {1, 2, 4, 5, 0, 3};
+    for (int k = 0; k < 6; ++k) {
+        if (ids[k] == 5 && !plain) continue;
         AppendMenuW(m, MF_OWNERDRAW | (gMenuItems[k].separator ? MF_DISABLED : 0), ids[k], (LPCWSTR)&gMenuItems[k]);
+    }
     POINT pt;
     GetCursorPos(&pt);
     int cmd = TrackPopupMenu(m, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hMain, nullptr);
@@ -800,6 +862,7 @@ void menuShot(int i) {
     if (cmd == 2)
         ShellExecuteW(hMain, L"open", L"explorer.exe", (L"/select,\"" + path + L"\"").c_str(), nullptr, SW_SHOWNORMAL);
     if (cmd == 4) beginRename(i);
+    if (cmd == 5) outlineFromPicture(path, gSelGroup, gSelZone);
     if (cmd == 3) deleteShot(i);
 }
 
@@ -1215,9 +1278,9 @@ void makeLayoutGraph() {
     }
     std::wstring dir = zoneDir(gSelGroup, gSelZone);
     renameOld(dir);
-    std::vector<std::wstring> files;  // outline pictures: "<seed>.png"
+    std::vector<std::wstring> files;  // outline pictures: "<seed>.png", "imported<n>.png"
     for (auto& f : listDir(dir, false))
-        if (outlineSeed(f)) files.push_back(dir + L"\\" + f);
+        if (isOutline(f)) files.push_back(dir + L"\\" + f);
     if (files.size() < 2) {
         MessageBoxW(hMain,
                     (L"A graph needs outlines of at least 2 runs of this zone; there " +
@@ -1273,9 +1336,16 @@ void makeLayoutGraph() {
                     outs.push_back(std::move(o[keep]));
                 }
             }
+            for (auto& f : files) {  // outlines made from pictures: each is a run of its own
+                if (!isImportedOutline(f.substr(f.find_last_of(L'\\') + 1))) continue;
+                outline::Outline o;
+                if (!withPicture(f, [&](Gdiplus::Bitmap& b) { return toImage(b, o.img); })) continue;
+                o.labels = outline::loadLabels(readText(sidecarFound(f)));
+                outs.push_back(std::move(o));
+            }
         }
         outline::Graph gr = outline::pointsGraph(outs);
-        auto* r = new ShotDone{L"", zone, gi, true, gr.used, (int)outs.size(), {}, 0};
+        auto* r = new ShotDone{L"", zone, gi, true, gr.used, (int)outs.size(), {}, 0, {}};
         if (!gr.img.empty()) {
             // caption and legend (how many runs had each point, and whether it stays in one place)
             std::vector<std::pair<std::wstring, POINT>> texts;
@@ -1369,11 +1439,13 @@ static bool zoneOfFolder(const std::wstring& name, const std::wstring& parent, i
 // folders name (a downloaded Layouts folder: <Act>\<Zone>\*.png, also by zone id, maps under Maps\<map>).
 void importLayouts() {
     groups();
-    enum { CMD_FILES = 1, CMD_FOLDER };
+    enum { CMD_FILES = 1, CMD_FOLDER, CMD_OUTLINE };
     HMENU m = CreatePopupMenu();
     std::wstring into = gSelZone.empty() ? L"Pictures into the selected zone..." : L"Pictures into " + gSelZone + L"...";
     AppendMenuW(m, MF_STRING | (gSelGroup < 0 || gSelZone.empty() ? MF_GRAYED : 0), CMD_FILES, into.c_str());
     AppendMenuW(m, MF_STRING, CMD_FOLDER, L"A folder: each picture to its zone...");
+    std::wstring from = gSelZone.empty() ? L"Outline from a picture..." : L"Outline from a picture, into " + gSelZone + L"...";
+    AppendMenuW(m, MF_STRING | (gSelGroup < 0 || gSelZone.empty() ? MF_GRAYED : 0), CMD_OUTLINE, from.c_str());
     RECT r;
     GetWindowRect(hLayImport, &r);
     int cmd = TrackPopupMenu(m, TPM_RETURNCMD | TPM_RIGHTBUTTON, r.left, r.bottom, 0, hMain, nullptr);
@@ -1382,6 +1454,12 @@ void importLayouts() {
     std::set<std::wstring> zones, unmatched;
     int lastGi = -1;
     std::wstring lastZone;
+    if (cmd == CMD_OUTLINE) {
+        for (auto& f : pickFiles(hMain, (L"Pictures of the map overlay in " + gSelZone).c_str(), L"Pictures",
+                                 L"*.png;*.jpg;*.jpeg;*.bmp"))
+            outlineFromPicture(f, gSelGroup, gSelZone);
+        return;
+    }
     if (cmd == CMD_FILES) {
         for (auto& f : pickFiles(hMain, (L"Pictures for " + gSelZone).c_str(), L"Pictures", L"*.png;*.jpg;*.jpeg;*.bmp")) {
             if (!isPicture(f)) continue;
@@ -1470,7 +1548,7 @@ std::vector<std::wstring> currentZonePictures(bool graphsOnly) {
     renameOld(dir);
     for (auto& f : listDir(dir, false))
         if (isGraph(f)) graphs.push_back(dir + L"\\" + f);
-        else if (!graphsOnly && outlineSeed(f)) outlines.push_back(dir + L"\\" + f);
+        else if (!graphsOnly && isOutline(f)) outlines.push_back(dir + L"\\" + f);
     sortNewest(graphs);
     sortNewest(outlines);
     graphs.insert(graphs.end(), outlines.begin(), outlines.end());
@@ -1518,6 +1596,10 @@ void takeLayoutShot() {
 // The snipping tool puts the selected area on the clipboard.
 void layoutDone(LPARAM lp) {
     std::unique_ptr<ShotDone> r((ShotDone*)lp);
+    if (!r->error.empty()) {
+        MessageBoxW(hMain, r->error.c_str(), L"Make outline", MB_ICONINFORMATION);
+        return;
+    }
     if (!r->graph) {
         shotSaved(r->what, r->gi, r->zone);
         if (!r->outline.empty() && r->seed == currentSeed()) graphOverlayShowPicture(r->outline);

@@ -68,27 +68,6 @@ bool AreaTable::mergeFrom(const AreaTable& newer) {
     return changed;
 }
 
-int AreaTable::takeNames(const AreaTable& other) {
-    int n = 0;
-    for (auto& [k, v] : other.m_e) {
-        if (!has(k)) {
-            n += add(k, v) && knownName(v);
-            continue;
-        }
-        if (!knownName(v)) continue;  // "unknown" never replaces a name
-        for (auto& e : m_e)
-            if (e.first == k && e.second != v) e.second = v, ++n;
-    }
-    return n;
-}
-
-bool AreaTable::isActTable() const {
-    if (m_e.empty()) return false;
-    for (auto& [k, v] : m_e)
-        if (actKeyOf(k) != k) return false;
-    return true;
-}
-
 AreaTable& zoneTable() {
     static AreaTable t;
     return t;

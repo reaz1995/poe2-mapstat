@@ -43,7 +43,6 @@ void showMapsPage() { showPage(gMapsPage); }
 
 // ---- Options pills: each control of the Options page belongs to one pill (or to all when not listed)
 HWND hOptPill[3] = {};
-HWND hZonesImport = nullptr;
 int gOptPill = 0;
 static std::map<HWND, int> gOptGroup;
 
@@ -245,7 +244,6 @@ void layout(int w, int h) {
             place(hOptPill[i], x, y, w, 30);
             x += w + 8;
         }
-        place(hZonesImport, R - 190, y - 1, 190, 32);
     }
     y += 46;
     const int top = y;
@@ -471,7 +469,7 @@ void createControls() {
         btn(L"Select the area (snipping tool) instead of the whole game window", ID_LAY_CROP, PG_OPTIONS, Btn::Check);
     {
         const wchar_t* names[HK_COUNT] = {L"Stop",         L"Pause / resume", L"Start new run", L"Layout screenshot",
-                                          L"Complete step", L"Undo step"};
+                                          L"Complete step", L"Undo step",      L"All steps (hold)"};
         for (int i = 0; i < HK_COUNT; ++i) {
             hKeyLbl[i] = label(names[i], ID_KEY_LBL0 + i, fNormal, PG_OPTIONS);
             hKeyBtn[i] = btn(hotkeyName(i).c_str(), ID_KEY_BTN0 + i, PG_OPTIONS, Btn::Normal);
@@ -503,7 +501,6 @@ void createControls() {
     hNotesChk = btn(L"Show notes", ID_STEPS_NOTES, PG_OPTIONS, Btn::Check);  // StepsOverlay row
     hCmpBestChk = btn(L"Time Comparison AddOn", ID_OV_COMPARE, PG_OPTIONS, Btn::Check);
     gOvCompare = GetPrivateProfileIntW(L"MapTimerOverlay", L"CompareBest", 0, iniPath().c_str()) != 0;
-    hZonesImport = btn(L"Load zone names...", ID_ZONES_IMPORT, PG_OPTIONS, Btn::Normal);
     {
         const wchar_t* pills[3] = {L"Overlays", L"Hotkeys", L"Theme"};
         for (int i = 0; i < 3; ++i) hOptPill[i] = btn(pills[i], ID_OPT_PILL0 + i, PG_OPTIONS, Btn::Pill);

@@ -8,17 +8,9 @@ A small Windows companion for **Path of Exile 2** that times your maps and campa
 by reading the game's log file (`LatestClient.txt`). No game memory reading, no input automation (except the optional
 chat-command buttons and hotkeys), nothing sent anywhere - it only reads the log the game writes anyway.
 
-![MapTimerOverlay](docs/overlay.gif)
+[![Showcase video](https://img.youtube.com/vi/MdSfjhtqrus/hqdefault.jpg)](https://www.youtube.com/watch?v=MdSfjhtqrus)
 
-*The timer overlay: a map is running (purple), you go to the hideout (the hideout becomes the header, the paused map
-moves to the records, orange), back into the same map (the timer continues), then a new map starts.*
-
-### In game
-
-| In a map | In the hideout | Campaign |
-|---|---|---|
-| ![Map](docs/ingame-map.png) | ![Hideout](docs/ingame-hideout.png) | ![Campaign](docs/ingame-campaign.png) |
-| timer, area level and exp lines, last maps below | the map you came from waits in the records | zone timer, zone level range, act and campaign time in the footer |
+*The showcase video on YouTube: click the picture to watch.*
 
 ---
 
@@ -44,12 +36,6 @@ moves to the records, orange), back into the same map (the timer continues), the
 - **Lives in the tray** - starts hidden, X and minimize hide it, left-click the tray icon to open it.
 
 ## The tabs
-
-| Maps: Summary | Experience |
-|---|---|
-| ![Summary](docs/summary.png) | ![Experience](docs/experience.png) |
-
-*(These two are from an earlier version; the other tabs have their screenshots in their sections.)*
 
 | Tab | For |
 |---|---|
@@ -193,7 +179,7 @@ copied into the zone. Changes made in Explorer show up by themselves.
 
 | Button | What it does |
 |---|---|
-| Import... | *Pictures into <zone>*, or *A folder*: every picture goes to the zone its folders name (`<Act>\<Zone>\`, a zone id like `G1_3\`, or `Maps\<map>\`); pictures already there are skipped |
+| Import... | *Pictures into <zone>*, or *A folder*: every picture goes to the zone its folders name (`<Act>\<Zone>\`, a zone id like `G1_3\`, or `Maps\<map>\`); pictures already there are skipped. *Outline from a picture*: see below |
 | Make graph | builds a graph from the zone's outlines (see below) |
 | Open folder | opens the zone's folder |
 
@@ -208,6 +194,13 @@ hotkey, walk on, press it again. Every screenshot that shows the overlay becomes
 where their walls overlap and joined in the background, also across zoom levels; a piece that overlaps nothing yet is
 kept until one does. The original screenshots stay in `pieces\<seed>`. Tip: use the same overlay zoom every run, a bit
 zoomed in, so the labels are sharp.
+
+**Outline from a picture.** A screenshot of the map overlay taken another way, or one someone shared, becomes an
+outline too: *Import... → Outline from a picture* (into the selected zone), or right-click a picture in the gallery →
+*Make outline from this picture*. The picture is scanned as it is: it is a single still picture, so nothing is moved
+or joined to fill the parts it doesn't show, and later screenshots are not added to it. A picture has no seed, so the
+outline is named `imported0.png`, then `imported1.png` and so on (the same picture twice is noticed). It counts for
+*Make graph* as a run of its own.
 
 **Graphs.** *Make graph* lines up the outlines of the selected zone (one per run) on their entrances, turning back
 runs the game rotated or mirrored, and marks where each place was: entrances that never move get a ring, places
@@ -275,9 +268,7 @@ walkthrough: [download/StepsPresets](download/StepsPresets).
 
 At the top: the log file (`LatestClient.txt`, found by itself on start: running game, Steam libraries, standalone
 install), *Always on top*, *Start hidden in tray*, *Check for updates on start* and *Exit app*. Under them three pills
-(the chosen one is remembered) and **Load zone names...**, which reads `zones.txt` / `acts.txt` files such as
-[download/ZoneNames](download/ZoneNames): their names replace the app's ("unknown" in a file never does) and ids the
-app doesn't know yet are added.
+(the chosen one is remembered).
 
 **Overlays** - *General*: transparency of all overlays (slider, 0-100%), click-through, *Hide overlays in
 screenshots*. Then one row per overlay with its own options on the right:
@@ -292,7 +283,7 @@ screenshots*. Then one row per overlay with its own options on the right:
 General defaults: transparency 10%, click-through on, hidden in screenshots on.
 
 **Hotkeys** - Stop, Pause / resume, Start new run, Layout screenshot (with *Select the area* for the snipping tool),
-Complete step, Undo step. Click one and press the key; Esc cancels, Delete or right-click → *Remove* clears it. None
+Complete step, Undo step, All steps (hold). Click one and press the key; Esc cancels, Delete or right-click → *Remove* clears it. None
 are set at first.
 
 **Theme** - Default (Dracula), Dark Cyan, Light or Nord, and the app version. *Check for updates* next to ⚙ updates
@@ -322,6 +313,7 @@ With the *Experience AddOn* on (Options), these lines appear under the header (n
 
 | Line | Meaning |
 |---|---|
+| `good exp area` / `very good exp area` | small print under the zone name, in campaign zones that level well: good in Mastodon Badlands, The Spires of Deshar, Dreadnought, Chimeral Wetlands, Utzaal, Heart of the Tribe and Pools of Khatal; very good in The Drowned City, Isle of Kin and Qimah |
 | `Area: 64 (56-64)  Lvl: 60` | the current area level (red when it is outside the safe range, with the level range in small print for zones that follow your level) and your character level |
 | `Best: 67` | the area level with the most exp per monster for your level |
 | `Exp: +29.82%` | on both lines: expected exp per monster compared to a monster of your own level (green = more, red = less) |
@@ -355,7 +347,8 @@ placed under the MapTimerOverlay. Pictures: [Layouts → Graphs](#layouts).
 **StepsOverlay** - the steps of the zone you are in (Steps tab): the last one done (green) and the next ones to do,
 as many as set in Options, each with its details in small print; optional steps are a shade darker. The zone and
 done / total are on top, the notes sit at the bottom as a footer when *Show notes* is on. The *Complete step* hotkey
-marks the next step done, *Undo step* the last one. Click a line (Alt + click with click-through on) to copy it,
+marks the next step done, *Undo step* the last one; while *All steps* is held the overlay shows every step of the
+zone (done ones too) and grows to fit, down to the bottom of the screen. Click a line (Alt + click with click-through on) to copy it,
 handy for search regexes; the hovered line is underlined. Double-click the zone name or empty space to open the app
 on the Steps tab. The height follows the steps; drag the top or bottom edge for a fixed height (right-click → *Fit
 height to steps* goes back), the sides for the width. On its first start it is placed right of the MapTimerOverlay.
@@ -451,14 +444,14 @@ g++ -std=c++20 -O2 -Isrc/core tools/replay.cpp src/core/*.cpp -o replay && ./rep
 
 ### Releasing an update
 
-The version lives in the `VERSION` file (e.g. `1.1.7`); CMake reads it for the app.
+The version lives in the `VERSION` file (e.g. `1.1.8`); CMake reads it for the app.
 
 1. Change `VERSION` to the new version.
 2. Overwrite `CHANGES.md` with what changed in this version (one `- ` line per change).
 3. Commit and push to `main`.
 
 `.github/workflows/release.yml` then builds the Release exe on GitHub (llvm-mingw on Linux, `GITHUB_REPO` set to this
-repository) and publishes the release `v1.1.7` with `Poe2MapStat.exe` attached and `CHANGES.md` as the release notes (the app shows them when it offers the update; without
+repository) and publishes the release `v1.1.8` with `Poe2MapStat.exe` attached and `CHANGES.md` as the release notes (the app shows them when it offers the update; without
 `CHANGES.md` GitHub generates notes from the commits).
 A push that doesn't change the version does nothing. It can also be started by hand under *Actions → Release → Run
 workflow*.
