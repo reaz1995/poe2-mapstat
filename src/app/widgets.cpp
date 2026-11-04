@@ -64,7 +64,7 @@ void drawButton(const DRAWITEMSTRUCT* d) {
     if (kind == Btn::Tab || kind == Btn::Gear) {
         FillRect(dc, &r, brDarkest);
         int page = d->hwndItem == hTabGen   ? (gPage == PG_SUMMARY ? PG_SUMMARY : PG_GENERAL)
-                   : d->hwndItem == hTabCmp ? PG_CAMPAIGN
+                   : d->hwndItem == hTabCmp ? (gPage == PG_CMP_RUNS ? PG_CMP_RUNS : PG_CAMPAIGN)
                    : d->hwndItem == hTabExp ? PG_EXPERIENCE
                    : d->hwndItem == hTabLay ? PG_LAYOUTS
                    : d->hwndItem == hTabSteps ? PG_STEPS
@@ -99,10 +99,12 @@ void drawButton(const DRAWITEMSTRUCT* d) {
     }
     if (kind == Btn::Pill) {
         bool lvl = d->hwndItem == hLvlCmp || d->hwndItem == hLvlMaps;  // level ups list mode
-        bool sub = lvl || d->hwndItem == hSubSession || d->hwndItem == hSubSummary;  // Maps sub-tabs, else act pills
-        bool sel = lvl   ? gLvlMaps == (d->hwndItem == hLvlMaps)
-                   : sub ? gPage == (d->hwndItem == hSubSession ? PG_GENERAL : PG_SUMMARY)
-                         : W(gSelAct) == text;
+        bool cmpSub = d->hwndItem == hCmpSubSession || d->hwndItem == hCmpSubRuns;  // Campaign: Session / Summary
+        bool sub = lvl || cmpSub || d->hwndItem == hSubSession || d->hwndItem == hSubSummary;  // else act pills
+        bool sel = lvl      ? gLvlMaps == (d->hwndItem == hLvlMaps)
+                   : cmpSub ? gPage == (d->hwndItem == hCmpSubSession ? PG_CAMPAIGN : PG_CMP_RUNS)
+                   : sub    ? gPage == (d->hwndItem == hSubSession ? PG_GENERAL : PG_SUMMARY)
+                            : W(gSelAct) == text;
         bool here = !sub && g.curZone >= 0 && W(Tracker::actOf(g.zones[g.curZone].areaId)) == text;
         fillRound(dc, r, 16, sel ? C::Purple : C::Card, sel ? C::Purple : hover ? C::Purple : C::Line);
         SelectObject(dc, fBold);
@@ -123,6 +125,8 @@ void drawButton(const DRAWITEMSTRUCT* d) {
                   : d->hwndItem == hClickChk   ? gClickThru
                   : d->hwndItem == hCaptureChk ? gHideInCapture
                   : d->hwndItem == hNotesChk   ? gStepsNotes
+                  : d->hwndItem == hCmpBestChk ? gOvCompare
+                  : d->hwndItem == hRunsLoadChk ? gRunsLoad
                   : d->hwndItem == hExpOvChk   ? gExpOnOverlay
                   : d->hwndItem == hLayCropChk ? gLayoutCrop
                                                : gOnTopOn;

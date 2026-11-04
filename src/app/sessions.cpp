@@ -1,6 +1,8 @@
 // MapSession / CampaignSession / SummarySession files: save, load, reset into a new file, restore an older one.
 #include "app.h"
 
+#include <algorithm>
+
 static std::wstring sessionsDir();
 static std::wstring uniquePath(const std::wstring& base);
 static void startNewSessionFile(SessionFile& sf);
@@ -15,7 +17,8 @@ static std::wstring sessionsDir() { return gDataDir + L"\\sessions"; }
 
 static std::wstring uniquePath(const std::wstring& base) {
     std::wstring p = base + L".tsv";
-    for (int i = 2; GetFileAttributesW(p.c_str()) != INVALID_FILE_ATTRIBUTES; ++i) p = base + L" (" + std::to_wstring(i) + L").tsv";
+    for (int i = 2; GetFileAttributesW(p.c_str()) != INVALID_FILE_ATTRIBUTES; ++i)
+        p = base + L" (" + std::to_wstring(i) + L").tsv";
     return p;
 }
 
@@ -26,7 +29,8 @@ std::wstring newSessionPath(const SessionFile& sf, const std::wstring& date, con
         SYSTEMTIME st;
         GetLocalTime(&st);
         wchar_t b[64];
-        swprintf(b, 64, L"%04d-%02d-%02d %02d-%02d-%02d", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+        swprintf(b, 64, L"%04d-%02d-%02d %02d-%02d-%02d", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute,
+                 st.wSecond);
         d = b;
     }
     return uniquePath(sessionsDir() + L"\\" + sf.prefix + L" " + d + suffix);
@@ -65,7 +69,8 @@ void initSessionFiles() {
     if (base.size() > 4) base.resize(base.size() - 4);  // drop ".tsv": keeps the old date (and suffix) in the new names
     for (SessionFile* sf : {&gMapFile, &gCmpFile}) {
         if (!sf->path.empty()) continue;
-        std::wstring np = base.empty() ? newSessionPath(*sf) : uniquePath(sessionsDir() + L"\\" + sf->prefix + L" " + base);
+        std::wstring np =
+            base.empty() ? newSessionPath(*sf) : uniquePath(sessionsDir() + L"\\" + sf->prefix + L" " + base);
         if (GetFileAttributesW(old.c_str()) != INVALID_FILE_ATTRIBUTES) CopyFileW(old.c_str(), np.c_str(), TRUE);
         setSessionFile(*sf, np);  // the old combined file stays; each new file loads only its own part
     }
@@ -152,6 +157,13 @@ void restoreSession(SessionFile& sf) {
     ofn.lpstrTitle = title;
     ofn.Flags = OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
     if (!GetOpenFileNameW(&ofn)) return;
+    restoreSessionFrom(sf, file);
+}
+
+// Continue with this MapSession / CampaignSession file (the current one is saved first).
+void restoreSessionFrom(SessionFile& sf, const std::wstring& file) {
+    bool maps = sf.parts == Tracker::kMaps;
+    const wchar_t* title = maps ? L"Restore map session" : L"Load campaign run";
     std::string d = readFileUtf8(file);
     if (d.rfind("POE2MAPSTAT", 0) != 0) {
         MessageBoxW(hMain, L"This is not a Poe2 | MapStat session file.", title, MB_ICONERROR);
@@ -173,17 +185,89 @@ void restoreSession(SessionFile& sf) {
     gHistDirty = true;
     refreshUi();
     if (maps) refreshSummary();
-    else refreshCampaign(true);
+    else invalidateBestZones(), refreshCampaign(true);
 }
 
 void resetCampaignRun() {
-    if (!ask(L"Reset Campaign Run", L"Reset the campaign run?\nAll zone timers start from zero. Export first if you want to keep the current run."))
+    if (!ask(L"Save and Clear",
+             L"Save the campaign run and start a new one?\nThe current run is kept in Campaign \u2192 Summary; all zone "
+             L"timers start from zero."))
         return;
     startCampaignRun();
 }
 
+// The campaign run files, newest first (their names start with the date they were made).
+std::vector<std::wstring> campaignRunFiles() {
+    std::vector<std::wstring> r;
+    WIN32_FIND_DATAW fd;
+    HANDLE f = FindFirstFileW((sessionsDir() + L"\\" + gCmpFile.prefix + L" *.tsv").c_str(), &fd);
+    if (f != INVALID_HANDLE_VALUE) {
+        do r.push_back(sessionsDir() + L"\\" + fd.cFileName);
+        while (FindNextFileW(f, &fd));
+        FindClose(f);
+    }
+    std::sort(r.begin(), r.end(), [](auto& a, auto& b) { return a > b; });
+    return r;
+}
+
+// Copy a campaign run file (from another PC or a backup) into the sessions folder, so it shows in Campaign → Summary.
+// A file named like the app's own keeps its name; any other gets one from its date and keeps its old name as the
+// run's name.
+void importCampaignRun() {
+    wchar_t file[MAX_PATH] = L"";
+    OPENFILENAMEW ofn = {};
+    ofn.lStructSize = sizeof ofn;
+    ofn.hwndOwner = hMain;
+    ofn.lpstrFilter = L"Campaign run (*.tsv)\0*.tsv\0All files\0*.*\0";
+    ofn.lpstrFile = file;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+    if (!GetOpenFileNameW(&ofn)) return;
+    std::string data = readFileUtf8(file);
+    Tracker t;
+    t.deserialize(data, Tracker::kCampaign);
+    if (t.zones.empty()) {
+        MessageBoxW(hMain, L"This file has no campaign zones in it.", L"Import campaign run", MB_ICONWARNING);
+        return;
+    }
+    std::wstring src = file, base = src.substr(src.find_last_of(L"\\/") + 1), stem = base, name;
+    if (size_t d = stem.rfind(L'.'); d != std::wstring::npos) stem.resize(d);
+    std::wstring prefix = std::wstring(gCmpFile.prefix) + L" ";
+    std::wstring dest;
+    if (base.rfind(prefix, 0) == 0) dest = base;
+    else {  // named after the file's date; the old name becomes the run's name
+        WIN32_FILE_ATTRIBUTE_DATA a;
+        SYSTEMTIME st = {};
+        FILETIME lt;
+        if (GetFileAttributesExW(file, GetFileExInfoStandard, &a) && FileTimeToLocalFileTime(&a.ftLastWriteTime, &lt))
+            FileTimeToSystemTime(&lt, &st);
+        else GetLocalTime(&st);
+        wchar_t b[64];
+        swprintf(b, 64, L"%04d-%02d-%02d %02d-%02d-%02d", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+        dest = prefix + b + L".tsv";
+        name = stem;
+    }
+    std::wstring dir = sessionsDir();
+    CreateDirectoryW(dir.c_str(), nullptr);
+    if (fileExists(dir + L"\\" + dest)) {
+        if (readFileUtf8(dir + L"\\" + dest) == data) {
+            MessageBoxW(hMain, L"This run is already in the list.", L"Import campaign run", MB_ICONINFORMATION);
+            return;
+        }
+        std::wstring stemD = dest.substr(0, dest.size() - 4);
+        for (int i = 2; fileExists(dir + L"\\" + dest); ++i) dest = stemD + L" (" + std::to_wstring(i) + L").tsv";
+    }
+    if (!CopyFileW(file, (dir + L"\\" + dest).c_str(), TRUE)) {
+        MessageBoxW(hMain, L"Cannot copy the file.", L"Import campaign run", MB_ICONERROR);
+        return;
+    }
+    if (!name.empty()) WritePrivateProfileStringW(L"CampaignRuns", dest.c_str(), name.c_str(), iniPath().c_str());
+    refreshCampaignRuns();
+}
+
 void startCampaignRun() {
-    startNewSessionFile(gCmpFile);  // the finished run stays in its own file (Restore campaign session)
+    invalidateBestZones();  // the run that ends here becomes one of the saved ones
+    startNewSessionFile(gCmpFile);  // the finished run stays in its own file (Campaign -> Summary)
     g.resetCampaign(nowTick(), nowClock());
     saveData();
     refreshCampaign(true);

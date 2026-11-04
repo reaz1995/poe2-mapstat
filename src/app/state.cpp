@@ -24,10 +24,10 @@ HWND hGenReset, hExpGen;
 
 HWND hSumHdr, hSumList, hSumReset, hExpSum, hLblSum;
 
-HWND hCmpTitle, hCmpTimer, hCmpStatus, hCmpList, hCmpReset, hExpCmp, hLblCmp, hCmpSum;
+HWND hCmpTitle, hCmpTimer, hCmpStatus, hCmpList, hExpCmp, hLblCmp, hCmpSum;
 HWND hCmpActList = nullptr;
 
-HWND hLblPath, hPath, hBrowse, hReload, hOnTop, hOptInfo, hOptLbl, hLoadHist, hRestoreGen, hRestoreCmp;
+HWND hLblPath, hPath, hBrowse, hReload, hOnTop, hOptInfo, hOptLbl, hLoadHist, hRestoreGen;
 
 HFONT fNormal, fBold, fTitle, fTimer, fSection, fTab;
 
@@ -60,7 +60,6 @@ HWND hLblUpd = nullptr, hUpdChk = nullptr, hUpdInfo = nullptr, hUpdTab = nullptr
 
 bool gAutoUpdate = true;
 HWND hCmpTimerLoad = nullptr;
-HWND hCmpPause = nullptr, hCmpStop = nullptr;
 HWND hLblKeys = nullptr, hKeyLbl[HK_COUNT] = {}, hKeyBtn[HK_COUNT] = {};
 HWND hTabExp, hExpName, hExpLevel, hExpArea, hExpTabEff, hExpMapEff, hExpGain, hExpInfo, hExpRowLbl, hExpOvChk,
     hExpHint, hExpList, hLvlCmp, hLvlMaps, hLvlExport;
@@ -115,6 +114,5 @@ bool gSkipExisting = true;  // track only new log lines (no replay of what is al
 
 bool gHistoryLoaded = false;
 
-bool gShrunk = false;
 
 std::wstring gDataDir;  // %APPDATA%\Poe2MapStat - settings, area names, stored runs

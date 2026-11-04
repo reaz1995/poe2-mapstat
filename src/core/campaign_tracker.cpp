@@ -1,4 +1,4 @@
-// Campaign zones: one timer per zone instance, acts, Reset Campaign Run.
+// Campaign zones: one timer per zone instance, acts, a new run (Save and Clear).
 #include <cctype>
 
 #include "area_tables.h"

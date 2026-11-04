@@ -921,7 +921,7 @@ void paint(HWND h) {
         if (gShots.empty()) {
             std::wstring key = hotkeyName(HK_LAYOUT);
             drawText(dc,
-                     gHotkeysOn && key != L"Not set"
+                     key != L"Not set"
                          ? L"No screenshots yet. Press " + key + L" while you are in this zone."
                          : std::wstring(L"No screenshots yet."),
                      {x0, kHeadH, rc.right, kHeadH + 24}, fNormal, C::Comment, DT_SINGLELINE | DT_VCENTER);

@@ -56,6 +56,12 @@ enum {
     ID_TAB_GEN,
     ID_TAB_SUM,
     ID_TAB_SES,
+    ID_TAB_CSES,
+    ID_TAB_CRUNS,
+    ID_CMP_RUNLIST,
+    ID_CMP_CMPLIST,
+    ID_RUNS_LOAD,
+    ID_OV_COMPARE,
     ID_TAB_CMP,
     ID_GEAR,
     ID_SUMHDR,
@@ -65,6 +71,9 @@ enum {
     ID_EXP_GEN,
     ID_EXP_SUM,
     ID_EXP_CMP,
+    ID_EXP_RUNS,
+    ID_RUNS_IMPORT,
+    ID_EXP_RUNCMP,
     ID_GEN_RESET,
     ID_SUM_RESET,
     ID_CMP_TITLE,
@@ -72,14 +81,12 @@ enum {
     ID_CMP_STATUS,
     ID_CMP_LIST,
     ID_CMP_ACTLIST,
-    ID_CMP_RESET,
     ID_LBL_CMP,
     ID_LBL_SUM,
     ID_CMP_SUM,
     ID_OPT_LBL,
     ID_LOAD_HIST,
     ID_RESTORE_GEN,
-    ID_RESTORE_CMP,
     ID_OVERLAY,
     ID_LBL_OVERLAY,
     ID_REC_LBL,
@@ -102,8 +109,6 @@ enum {
     ID_UPD_INFO,
     ID_UPD_TAB,
     ID_CMP_TIMER_LOAD,
-    ID_CMP_PAUSE,
-    ID_CMP_STOP,
     ID_LBL_KEYS,
     ID_TAB_EXP,
     ID_LVL_CMP,
@@ -164,6 +169,7 @@ enum {
     PG_EXPERIENCE = 4,
     PG_LAYOUTS = 5,
     PG_STEPS = 6,
+    PG_CMP_RUNS = 7,  // Campaign tab, Summary pill: the saved runs
     PG_COUNT
 };
 
@@ -251,20 +257,38 @@ extern HBRUSH brBg, brCard, brDarkest;
 extern HWND hMain;
 extern HWND hTabGen, hTabCmp, hTabLay, hGear;
 extern HWND hSubSession, hSubSummary;  // Maps tab: Session / Summary sub-tabs
+extern HWND hCmpSubSession, hCmpSubRuns, hCmpRunList, hLblRuns, hCmpCmpList, hLblCmpCmp, hExpRuns, hExpRunCmp, hRunsImport;  // Campaign tab: Session / Summary (saved runs)
+extern HWND hRunsLoadChk;  // Campaign -> Summary: Include loading time
+extern bool gRunsLoad;
+void showCampaignPage();  // the Campaign tab's last pill
+void refreshCampaignRuns();
+void importCampaignRun();
+LRESULT campaignRunsNotify(NMHDR* nh);
+LRESULT campaignCompareNotify(NMHDR* nh);
+void invalidateBestZones();
+void campaignRunsSaveOrder(HWND lv);  // a column was dragged: both run lists take the new order
+int64_t bestZoneMs(const std::string& areaId);  // best time in a zone over the saved runs, -1 if none
+std::wstring zoneVsBest(const std::string& areaId, uint32_t now);
+// the act before the current one: name, time and "(+3m15s)" against the pinned run or the best; false if none
+bool previousAct(uint32_t now, std::wstring& name, std::wstring& time, std::wstring& cmp);
+int64_t bestActMs(const std::string& act);  // time to beat for a whole act, -1 if none
+std::wstring diffInParens(int64_t ms);       // "(+3m15s)" / "(-20s)"
+extern bool gOvCompare;  // Options: MapTimerOverlay compares the zone time with the best run
+extern HWND hCmpBestChk;  // Options: Time Comparison AddOn
 extern HWND hTitle, hStatus, hTimer, hDetLbl, hDetails, hSummary, hHist, hLblHist;
 extern HWND hGenReset, hExpGen;
 extern HWND hSumHdr, hSumList, hSumReset, hExpSum, hLblSum;
-extern HWND hCmpTitle, hCmpTimer, hCmpStatus, hCmpList, hCmpReset, hExpCmp, hLblCmp, hCmpSum;
-extern HWND hCmpActList;  // the Summary pill: one row per act
+extern HWND hCmpTitle, hCmpTimer, hCmpStatus, hCmpList, hExpCmp, hLblCmp, hCmpSum;
+extern HWND hCmpActList;  // the Act Summary pill: one row per act
 static const int kCmpActW[] = {170, 100, 90, 90, 90, 70, 100};
-void campaignTimerMenu(POINT pt);  // right-click on the campaign timer: Generate Summary
+void campaignTimerMenu(POINT pt);  // right-click on the campaign timer: Pause, Stop, Generate Act Summary, Save and Clear
 void campaignShowLists();
 extern HWND hOptPill[3];  // Options: Overlays, Hotkeys, Theme
 extern int gOptPill;
 void setOptPill(int i);
 extern HWND hZonesImport;  // Options: Load zone names...
-void importAreaTables();         // the zone list or the act summary, for the pill chosen
-extern HWND hLblPath, hPath, hBrowse, hReload, hOnTop, hOptInfo, hOptLbl, hLoadHist, hRestoreGen, hRestoreCmp;
+void importAreaTables();  // Options: Load zone names...
+extern HWND hLblPath, hPath, hBrowse, hReload, hOnTop, hOptInfo, hOptLbl, hLoadHist, hRestoreGen;
 extern HFONT fNormal, fBold, fTitle, fTimer, fSection, fTab;
 extern std::vector<HWND> gPages[PG_COUNT];
 extern std::vector<RECT> gCards[PG_COUNT];  // rounded panels painted behind controls
@@ -282,9 +306,7 @@ extern HWND hLblTheme, hThemeSel;
 extern HWND hLblUpd, hUpdChk, hUpdInfo, hUpdTab;
 extern bool gAutoUpdate;
 extern HWND hCmpTimerLoad;  // Campaign: zone time including its loading screens
-extern HWND hCmpPause, hCmpStop;
 extern HWND hLblKeys, hKeyLbl[], hKeyBtn[];  // one per hotkey (HK_COUNT)
-extern bool gHotkeysOn;  // always on (keys can be unset)
 extern HWND hTabExp, hExpName, hExpLevel, hExpArea, hExpTabEff, hExpMapEff, hExpGain, hExpInfo, hExpRowLbl, hExpOvChk,
     hExpHint, hExpList, hLvlCmp, hLvlMaps, hLvlExport;
 static const int kLvlW[] = {40, 220, 70, 80, 80, 110, 90, 150};  // level ups list
@@ -323,7 +345,6 @@ extern uint64_t gLinesRead;
 extern std::atomic<int> gImportPct;  // -1 = idle (Load past events)
 extern bool gSkipExisting;  // track only new log lines (no replay of what is already in the log)
 extern bool gHistoryLoaded;
-extern bool gShrunk;
 extern std::wstring gDataDir;  // %APPDATA%\Poe2MapStat - settings, area names, stored runs
 extern SessionFile gMapFile;
 extern SessionFile gCmpFile;
@@ -376,6 +397,8 @@ bool ask(const wchar_t* title, const wchar_t* text);
 void resetSummaryData();
 void resetGeneralSession();
 void restoreSession(SessionFile& sf);
+void restoreSessionFrom(SessionFile& sf, const std::wstring& file);
+std::vector<std::wstring> campaignRunFiles();  // CampaignSession files, newest first
 void resetCampaignRun();
 void startCampaignRun();  // new run without asking (hotkey / Start after Stop)
 
@@ -430,6 +453,9 @@ void refreshUi();
 // ---------------------------------------------------------------- page_summary.cpp
 void refreshSummary();
 void hideTip();
+void showListTip(const std::wstring& key, const std::wstring& title,
+                 const std::vector<std::pair<std::wstring, std::wstring>>& lines);
+void campaignRunsHover(HWND lv, LPARAM lp);  // Campaign -> Summary: an act cell shows its zones
 void summaryHover(HWND lv, LPARAM lp);
 
 // ---------------------------------------------------------------- hotkeys.cpp

@@ -67,7 +67,7 @@ LRESULT CALLBACK keyProc(int code, WPARAM wp, LPARAM lp) {
             if (down && !repeat) PostMessageW(hMain, WM_KEY_CAPTURED, vk, currentMods());
             return 1;
         }
-        if (down && !repeat && gCapture < 0 && gHotkeysOn) {
+        if (down && !repeat && gCapture < 0) {
             int mods = currentMods();
             for (int i = 0; i < HK_COUNT; ++i)
                 if (gKeys[i].vk && gKeys[i].vk == vk && gKeys[i].mods == mods && targetInFront()) {
@@ -115,7 +115,6 @@ void endCapture() {
 
 }  // namespace
 
-bool gHotkeysOn = true;  // always: a key that is not set does nothing
 
 void loadHotkeys() {
     for (auto& k : gKeys) {
