@@ -36,6 +36,9 @@ LatestClient.txt
 Client.txt
 *.log
 
+# helper scripts (zone tables from the game files, download folders, log replay, icon): kept locally
+tools/
+
 # editors / tools
 .vscode/
 .idea/
