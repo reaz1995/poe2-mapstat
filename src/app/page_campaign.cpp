@@ -1,10 +1,14 @@
-// Campaign tab: act pills, zone list and totals.
+// Campaign tab: act pills, zone list and totals; the Summary pill (one row per act) once the run is stopped.
 #include "app.h"
 
 static void syncActTabs();
 
 // The first pill shows the whole run: all zones, and the header shows the campaign time instead of the zone time.
 static const char* kAllActs = "Campaign";
+// The last pill, once the run is stopped (or the summary was made from the timer's menu): one row per act.
+static const char* kSummary = "Summary";
+static bool gSumManual = false;  // Generate Summary (timer menu) for a run still going
+static bool gWasStopped = false;
 
 // Act sub-tabs: "Campaign" first, then one pill per act seen in the zones list, in order of first visit.
 static void syncActTabs() {
@@ -13,6 +17,7 @@ static void syncActTabs() {
         std::string a = Tracker::actOf(z.areaId);
         if (std::find(acts.begin(), acts.end(), a) == acts.end()) acts.push_back(a);
     }
+    if ((g.cmpClock == Tracker::Clock::Stopped || gSumManual) && !g.zones.empty()) acts.push_back(kSummary);
     if (acts == gActs) return;
     for (HWND h : gActBtns) {
         auto& pg = gPages[PG_CAMPAIGN];
@@ -41,7 +46,88 @@ void selectAct(const std::string& act) {
 // Pause / Stop buttons follow the campaign clock.
 static void syncClockButtons() {
     setTextIfChanged(hCmpPause, g.cmpClock == Tracker::Clock::Paused ? L"Resume" : L"Pause");
-    setTextIfChanged(hCmpStop, g.cmpClock == Tracker::Clock::Stopped ? L"Start" : L"Stop");
+    setTextIfChanged(hCmpStop, g.cmpClock == Tracker::Clock::Stopped ? L"Reset" : L"Stop");
+}
+
+// "21:13:15" -> seconds of the day, -1 if not readable
+static int daySec(const std::string& t) {
+    int h, m, s;
+    return sscanf(t.c_str(), "%d:%d:%d", &h, &m, &s) == 3 ? h * 3600 + m * 60 + s : -1;
+}
+
+// The Summary pill: per act (in the order played) its time without loading screens, when it was started and left,
+// its loading time, how many zones (towns not counted) and the average time per zone.
+static void fillActSummary(uint32_t now) {
+    struct Act {
+        std::string name, start, end;
+        int startSec = -1, endSec = -1;  // end: seconds after the start's day (a run can pass midnight)
+        uint64_t ms = 0, zoneMs = 0;
+        double load = 0;
+        int zones = 0;
+    };
+    std::vector<Act> acts;
+    for (const Zone& z : g.zones) {
+        std::string a = Tracker::actOf(z.areaId);
+        auto it = std::find_if(acts.begin(), acts.end(), [&](const Act& x) { return x.name == a; });
+        if (it == acts.end()) {
+            acts.push_back(Act{});
+            acts.back().name = a;
+            it = acts.end() - 1;
+        }
+        Act& x = *it;
+        uint64_t ms = z.activeAt(now);
+        x.ms += ms;
+        x.load += z.loadSec;
+        if (!z.town) x.zones++, x.zoneMs += ms;
+        if (x.start.empty() && !z.firstEnter.empty()) x.start = z.firstEnter, x.startSec = daySec(z.firstEnter);
+        std::string end = z.inSegment ? g.lastTime : !z.lastLeft.empty() ? z.lastLeft : z.lastEnter;
+        int e = daySec(end);
+        if (e >= 0 && x.startSec >= 0) {
+            if (e < x.startSec) e += 86400;
+            if (e > x.endSec) x.endSec = e, x.end = end;
+        }
+    }
+    std::vector<LvRow> rows;
+    uint64_t total = 0, totalZoneMs = 0;
+    double load = 0;
+    int zones = 0;
+    for (size_t i = 0; i < acts.size(); ++i) {
+        const Act& a = acts[i];
+        total += a.ms, totalZoneMs += a.zoneMs, load += a.load, zones += a.zones;
+        rows.push_back({{W(a.name), W(fmtDuration(a.ms)), W(a.start), W(a.end), secs(a.load), std::to_wstring(a.zones),
+                         a.zones ? W(fmtDuration(a.zoneMs / a.zones)) : L"-"},
+                        (int)i});
+    }
+    sortRows(hCmpActList, rows);
+    if (!acts.empty())
+        rows.push_back({{L"Campaign", W(fmtDuration(total)), W(acts.front().start), W(acts.back().end), secs(load),
+                         std::to_wstring(zones), zones ? W(fmtDuration(totalZoneMs / zones)) : L"-"},
+                        (int)acts.size()});
+    writeRows(hCmpActList, rows);
+    setTextIfChanged(hCmpSum, std::to_wstring(acts.size()) + L" acts  \u00b7  " + std::to_wstring(zones) +
+                                  L" zones  \u00b7  total " + W(fmtDuration(total)) + L"  \u00b7  load " + secs(load) +
+                                  L"  \u00b7  times without loading screens");
+}
+
+void campaignShowLists() {
+    if (!hCmpActList) return;
+    bool page = gPage == PG_CAMPAIGN, sum = gSelAct == kSummary;
+    ShowWindow(hCmpList, page && !sum ? SW_SHOW : SW_HIDE);
+    ShowWindow(hCmpActList, page && sum ? SW_SHOW : SW_HIDE);
+    setTextIfChanged(hLblCmp, sum ? L"ACTS" : L"ZONES");
+}
+
+void campaignTimerMenu(POINT pt) {
+    HMENU m = CreatePopupMenu();
+    AppendMenuW(m, MF_STRING | (g.zones.empty() ? MF_GRAYED : 0), 1, L"Generate Summary");
+    int cmd = TrackPopupMenu(m, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hMain, nullptr);
+    DestroyMenu(m);
+    if (cmd == 1) {
+        gSumManual = true;
+        refreshCampaign(true);
+        selectAct(kSummary);
+        refreshCampaign(true);
+    }
 }
 
 void refreshCampaign(bool force) {
@@ -49,8 +135,11 @@ void refreshCampaign(bool force) {
     g.expireZones(now);
     syncClockButtons();
     bool stopped = g.cmpClock == Tracker::Clock::Stopped;
+    if (g.zones.empty()) gSumManual = false;  // a new run
     syncActTabs();
-    bool all = gSelAct == kAllActs;
+    if (stopped && !gWasStopped && !g.zones.empty()) selectAct(kSummary);  // the run was just stopped
+    gWasStopped = stopped;
+    bool all = gSelAct == kAllActs || gSelAct == kSummary;
     if (all) {  // whole run: the sum of all zones, so pause / stop / reset apply to it the same way
         uint64_t ms = 0;
         double load = 0;
@@ -87,13 +176,13 @@ void refreshCampaign(bool force) {
         setTextIfChanged(hCmpTitle, L"Campaign run stopped");
         setTextIfChanged(hCmpTimer, W(fmtDuration(total)));
         setTextIfChanged(hCmpTimerLoad, L"");
-        setTextIfChanged(hCmpStatus, gHotkeysOn ? L"Press " + hotkeyName(HK_START) + L" or Start to begin a new run"
-                                                : std::wstring(L"Press Start to begin a new run"));
+        setTextIfChanged(hCmpStatus, gHotkeysOn ? L"Press " + hotkeyName(HK_START) + L" or Reset to begin a new run"
+                                                : std::wstring(L"Press Reset to begin a new run"));
     } else {
         setTextIfChanged(hCmpTimerLoad, L"");
         setTextIfChanged(hCmpTitle, L"Not in a campaign zone");
         setTextIfChanged(hCmpTimer, L"00:00");
-        setTextIfChanged(hCmpStatus, W("In " + (g.locationName.empty() ? g.location : g.locationName)));
+        setTextIfChanged(hCmpStatus, W("In " + g.locationDisplay()));
     }
     InvalidateRect(hCmpTimer, nullptr, FALSE);
     InvalidateRect(hCmpTimerLoad, nullptr, FALSE);
@@ -101,7 +190,13 @@ void refreshCampaign(bool force) {
     // entering a zone (or a new act) switches to that act's tab, unless the whole campaign is shown
     if (g.curZone != gLastCurZone) {
         gLastCurZone = g.curZone;
-        if (g.curZone >= 0 && gSelAct != kAllActs) selectAct(Tracker::actOf(g.zones[g.curZone].areaId));
+        if (g.curZone >= 0 && gSelAct != kAllActs && gSelAct != kSummary)
+            selectAct(Tracker::actOf(g.zones[g.curZone].areaId));
+    }
+    campaignShowLists();
+    if (gSelAct == kSummary) {
+        fillActSummary(now);
+        return;
     }
 
     // rows of the selected act

@@ -1,6 +1,8 @@
 // Creates all controls and lays out the pages.
 #include "app.h"
 
+#include <map>
+
 static HWND hExpCap[6];  // captions above the Experience inputs
 static HWND hExpModsLbl;  // "TABLETS / MAP MODS" section title
 
@@ -8,6 +10,26 @@ static HWND hExpModsLbl;  // "TABLETS / MAP MODS" section title
 static int gMapsPage = PG_GENERAL;
 
 void showMapsPage() { showPage(gMapsPage); }
+
+// ---- Options pills: each control of the Options page belongs to one pill (or to all when not listed)
+HWND hOptPill[3] = {};
+HWND hZonesImport = nullptr;
+int gOptPill = 0;
+static std::map<HWND, int> gOptGroup;
+
+static void applyOptPill() {
+    for (auto& [h, grp] : gOptGroup)
+        if (h) ShowWindow(h, gPage == PG_OPTIONS && grp == gOptPill ? SW_SHOW : SW_HIDE);
+    for (HWND h : hOptPill)
+        if (h) InvalidateRect(h, nullptr, FALSE);
+}
+
+void setOptPill(int i) {
+    gOptPill = i;
+    WritePrivateProfileStringW(L"main", L"OptionsPill", std::to_wstring(i).c_str(), iniPath().c_str());
+    applyOptPill();
+    InvalidateRect(hMain, nullptr, TRUE);
+}
 
 void showPage(int p) {
     gPage = p;
@@ -19,12 +41,15 @@ void showPage(int p) {
         ShowWindow(h, maps ? SW_SHOW : SW_HIDE);
         InvalidateRect(h, nullptr, FALSE);
     }
-    for (HWND h : {hTabGen, hTabCmp, hTabExp, hTabLay, hGear}) InvalidateRect(h, nullptr, FALSE);
+    for (HWND h : {hTabGen, hTabCmp, hTabExp, hTabLay, hTabSteps, hGear}) InvalidateRect(h, nullptr, FALSE);
     if (p == PG_EXPERIENCE) refreshExperience();
     if (p == PG_LAYOUTS) refreshLayouts();
+    if (p == PG_STEPS) stepsChanged();
     InvalidateRect(hMain, nullptr, TRUE);
     if (p == PG_SUMMARY) refreshSummary();
     if (p == PG_CAMPAIGN) refreshCampaign(true);
+    campaignShowLists();
+    applyOptPill();
 }
 
 void layout(int w, int h) {
@@ -37,6 +62,7 @@ void layout(int w, int h) {
     place(hTabCmp, 108, 0, 116, kTabBarH);
     place(hTabExp, 224, 0, 122, kTabBarH);
     place(hTabLay, 346, 0, 106, kTabBarH);
+    place(hTabSteps, 452, 0, 90, kTabBarH);
     place(hGear, w - kTabBarH - 6, 0, kTabBarH, kTabBarH);
     if (hUpdTab) place(hUpdTab, w - kTabBarH - 6 - 170, 0, 166, kTabBarH);  // just left of the gear
 
@@ -96,13 +122,17 @@ void layout(int w, int h) {
         int cy = gActRowY + 70;
         card(PG_CAMPAIGN, L, cy, CW, B - cy);
         place(hCmpList, L + 6, cy + 6, CW - 12, B - cy - 12);
+        place(hCmpActList, L + 6, cy + 6, CW - 12, B - cy - 12);
     }
 
     // ---- Layouts
-    place(hLayHint, L, T + 6, CW - 330, 20);
+    place(hLayImport, R - 436, T, 112, rh);
     place(hLayFolder, R - 150, T, 150, rh);
     place(hLayGraph, R - 316, T, 158, rh);
     place(hGallery, L, T + rh + 12, CW, B - (T + rh + 12));
+
+    // ---- Steps
+    layoutStepsPage(L, T, R, B);
 
     // ---- Experience
     y = T;
@@ -130,11 +160,16 @@ void layout(int w, int h) {
         }
         y += 24;
         y += rh + 18;
-        card(PG_EXPERIENCE, L, y, CW, 8 * 20 + 2 * pad);
-        place(hExpRowLbl, L + pad + 4, y + pad, 170, 8 * 20);
-        place(hExpInfo, L + pad + 180, y + pad, CW - 2 * pad - 184, 8 * 20);
-        y += 8 * 20 + 2 * pad + 16;
-        place(hExpOvChk, L, y, 420, 26);
+        const int rows = 11;
+        card(PG_EXPERIENCE, L, y, CW, rows * 20 + 2 * pad);
+        place(hExpRowLbl, L + pad + 4, y + pad, 190, rows * 20);
+        place(hExpInfo, L + pad + 200, y + pad, CW - 2 * pad - 204, rows * 20);
+        y += rows * 20 + 2 * pad + 16;
+        place(hLvlCmp, L, y, 110, 30);
+        place(hLvlMaps, L + 118, y, 90, 30);
+        place(hLvlExport, R - 130, y - 1, 130, 32);
+        y += 38;
+        place(hExpList, L, y, CW, std::max(80, B - y));
     }
 
     // ---- Options
@@ -147,42 +182,73 @@ void layout(int w, int h) {
     place(hReload, R - 152, y, 152, rh);
     y += rh + 18;
     place(hOnTop, L, y, 200, 26);
-    place(hCloseChk, L + 220, y, 300, 26);
+    place(hCloseChk, L + 220, y, 240, 26);
+    if (hUpdChk) place(hUpdChk, L + 480, y, 260, 26);
     place(hExitBtn, R - 140, y - 3, 140, rh);
     y += 44;
-    place(hLblOverlay, L, y, CW, 18);
-    y += 26;
-    place(hOverlayChk, L, y, 200, 26);
-    place(hClickChk, L + 500, y, 340, 26);
-    place(hRecLbl, L + 220, y + 4, 110, 20);
-    place(hRecMinus, L + 334, y - 3, 34, rh);
-    place(hRecVal, L + 372, y + 4, 34, 20);
-    place(hRecPlus, L + 410, y - 3, 34, rh);
-    y += 40;
-    place(hCmdChk, L, y, 210, 26);
-    place(hAlphaLbl, L + 220, y + 4, 110, 20);
-    place(hAlphaMinus, L + 334, y - 3, 34, rh);
-    place(hAlphaVal, L + 370, y + 4, 48, 20);
-    place(hAlphaPlus, L + 420, y - 3, 34, rh);
-    y += 40;
-    place(hGraphChk, L, y, 210, 26);
-    y += 44;
-    place(hLblKeys, L, y, CW, 18);
-    y += 26;
-    y += 4;
-    for (int i = 0; i < HK_COUNT; ++i, y += rh + 6) {  // one column: name, key
-        place(hKeyLbl[i], L, y + 6, 130, 20);
-        place(hKeyBtn[i], L + 140, y, 140, rh);
-        if (i == HK_LAYOUT) place(hLayCropChk, L + 300, y + 3, 460, 26);
+    {  // the pills, then the chosen one's options (all pills start at the same y)
+        int x = L;
+        for (int i = 0; i < 3; ++i) {
+            int w = i == 0 ? 110 : i == 1 ? 104 : 90;
+            place(hOptPill[i], x, y, w, 30);
+            x += w + 8;
+        }
+        place(hZonesImport, R - 190, y - 1, 190, 32);
     }
-    y += 14;
+    y += 46;
+    const int top = y;
+    // Overlays: General (all overlays), then one row per overlay with its options on the right
+    place(hLblOverlay, L, y, CW, 18);
+    y += 28;
+    place(hOvGeneralLbl, L, y, 200, 18);
+    y += 24;
+    place(hAlphaLbl, L, y + 4, 110, 20);
+    place(hAlphaSlider, L + 110, y, 260, 26);
+    place(hAlphaVal, L + 380, y + 4, 48, 20);
+    place(hClickChk, L + 450, y, 260, 26);
+    place(hCaptureChk, L + 720, y, 300, 26);
+    y += 42;
+    place(hOvEachLbl, L, y, 200, 18);
+    y += 24;
+    const int ox = L + 260;  // where an overlay's options start
+    place(hOverlayChk, L, y, 240, 26);
+    place(hRecLbl, ox, y + 4, 110, 20);
+    place(hRecMinus, ox + 114, y - 3, 34, rh);
+    place(hRecVal, ox + 152, y + 4, 34, 20);
+    place(hRecPlus, ox + 190, y - 3, 34, rh);
+    place(hExpOvChk, ox + 250, y, CW - (ox + 250 - L), 26);
+    y += 40;
+    place(hCmdChk, L, y, 240, 26);
+    y += 40;
+    place(hGraphChk, L, y, 240, 26);
+    place(hGraphOnlyChk, ox, y, 200, 26);
+    y += 40;
+    place(hStepsChk, L, y, 240, 26);
+    place(hStepsLbl, ox, y + 4, 110, 20);
+    place(hStepsMinus, ox + 114, y - 3, 34, rh);
+    place(hStepsVal, ox + 152, y + 4, 34, 20);
+    place(hStepsPlus, ox + 190, y - 3, 34, rh);
+    place(hNotesChk, ox + 250, y, 160, 26);
+    // Hotkeys
+    y = top;
+    place(hLblKeys, L, y, CW, 18);
+    y += 30;
+    for (int i = 0; i < HK_COUNT; ++i) {  // campaign + layout keys in one column, steps keys next to the first two
+        bool steps = i >= HK_STEP_DONE;
+        int x = steps ? L + 320 : L, ky = y + (steps ? i - HK_STEP_DONE : i) * (rh + 6);
+        place(hKeyLbl[i], x, ky + 6, 130, 20);
+        place(hKeyBtn[i], x + 140, ky, 140, rh);
+        if (i == HK_LAYOUT) place(hLayCropChk, L + 300, ky + 3, 460, 26);
+    }
+    // Theme
+    y = top;
     place(hLblTheme, L, y, 240, 18);  // theme and updates side by side
     place(hLblUpd, L + 280, y, CW - 280, 18);
     y += 26;
     place(hThemeSel, L, y, 240, rh);
-    if (hUpdChk) place(hUpdChk, L + 280, y + 3, 250, 26);
-    place(hUpdInfo, hUpdChk ? L + 540 : L + 280, y + 6, hUpdChk ? CW - 540 : CW - 280, 20);
-    y += rh + 20;
+    place(hUpdInfo, L + 280, y + 6, CW - 280, 20);
+    // about the app, at the bottom whatever pill
+    y = B - (7 * 20 + 2 * pad);
     card(PG_OPTIONS, L, y, CW, 7 * 20 + 2 * pad);
     place(hOptLbl, L + pad + 4, y + pad, 130, 7 * 20);
     place(hOptInfo, L + pad + 140, y + pad, CW - 2 * pad - 144, 7 * 20);
@@ -190,6 +256,8 @@ void layout(int w, int h) {
     fitColumns(hHist, kHistW, 9);
     fitColumns(hSumList, kSumW, 7);
     fitColumns(hCmpList, kCmpW, 11);
+    fitColumns(hCmpActList, kCmpActW, 7);
+    fitColumns(hExpList, kLvlW, 8);
     InvalidateRect(hMain, nullptr, TRUE);
 }
 
@@ -203,6 +271,7 @@ void createControls() {
     hTabCmp = btn(L"Campaign", ID_TAB_CMP, -1, Btn::Tab);
     hTabExp = btn(L"Experience", ID_TAB_EXP, -1, Btn::Tab);
     hTabLay = btn(L"Layouts", ID_TAB_LAY, -1, Btn::Tab);
+    hTabSteps = btn(L"Steps", ID_TAB_STEPS, -1, Btn::Tab);
     hGear = btn(L"", ID_GEAR, -1, Btn::Gear);
 #ifdef UPDATE_REPO
     hUpdTab = btn(L"Check for updates", ID_UPD_TAB, -1, Btn::Tab);
@@ -244,6 +313,13 @@ void createControls() {
     const wchar_t* cc[] = {L"#",       L"Zone",       L"Area Lvl", L"Area ID", L"Seed", L"Start", L"Last entered",
                            L"Entries", L"Total time", L"Load",     L"Avg load"};
     hCmpList = list(ID_CMP_LIST, PG_CAMPAIGN, cc, kCmpW, 11, 0b11110010100);
+    const wchar_t* ca[] = {L"Act", L"Time", L"Start", L"End", L"Load", L"Zones", L"Avg / zone"};
+    hCmpActList = list(ID_CMP_ACTLIST, PG_CAMPAIGN, ca, kCmpActW, 7, 0b1110010);
+    {  // shown instead of the zone list, not with the page (campaignShowLists)
+        auto& pg = gPages[PG_CAMPAIGN];
+        pg.erase(std::remove(pg.begin(), pg.end(), hCmpActList), pg.end());
+        ShowWindow(hCmpActList, SW_HIDE);
+    }
     for (HWND lv : {hHist, hSumList, hCmpList}) addSearchBox(lv);
 
     // Options
@@ -262,12 +338,20 @@ void createControls() {
     hRecVal = label(L"3", ID_REC_VAL, fBold, PG_OPTIONS, false, SS_CENTER);
     hRecPlus = btn(L"+", ID_REC_PLUS, PG_OPTIONS, Btn::Normal);
     hCmdChk = btn(L"CommandBarOverlay", ID_CMDBAR, PG_OPTIONS, Btn::Check);
-    hGraphChk = btn(L"GraphOverlay", ID_GRAPH_OV, PG_OPTIONS, Btn::Check);
+    hGraphChk = btn(L"Graph / outline overlay", ID_GRAPH_OV, PG_OPTIONS, Btn::Check);
+    hGraphOnlyChk = btn(L"Only graphs", ID_GRAPH_ONLY, PG_OPTIONS, Btn::Check);
+    hStepsChk = btn(L"StepsOverlay", ID_STEPS_OV, PG_OPTIONS, Btn::Check);
+    hStepsLbl = label(L"Steps shown", ID_STEPS_LBL, fNormal, PG_OPTIONS);
+    hStepsMinus = btn(L"\u2212", ID_STEPS_MINUS, PG_OPTIONS, Btn::Normal);
+    hStepsVal = label(L"5", ID_STEPS_VAL, fBold, PG_OPTIONS, false, SS_CENTER);
+    hStepsPlus = btn(L"+", ID_STEPS_PLUS, PG_OPTIONS, Btn::Normal);
     hAlphaLbl = label(L"Transparency", ID_ALPHA_LBL, fNormal, PG_OPTIONS);
-    hAlphaMinus = btn(L"\u2212", ID_ALPHA_MINUS, PG_OPTIONS, Btn::Normal);
-    hAlphaVal = label(L"10%", ID_ALPHA_VAL, fBold, PG_OPTIONS, false, SS_CENTER);
-    hAlphaPlus = btn(L"+", ID_ALPHA_PLUS, PG_OPTIONS, Btn::Normal);
-    hClickChk = btn(L"Click-through  (hold Alt to use overlays)", ID_CLICKTHRU, PG_OPTIONS, Btn::Check);
+    hAlphaSlider = slider(ID_ALPHA_SLIDER, PG_OPTIONS, 0, 100);
+    hAlphaVal = label(L"10%", ID_ALPHA_VAL, fBold, PG_OPTIONS, false, SS_LEFT);
+    hOvGeneralLbl = label(L"General", ID_OV_GENERAL, fBold, PG_OPTIONS);
+    hOvEachLbl = label(L"Overlays", ID_OV_EACH, fBold, PG_OPTIONS);
+    hClickChk = btn(L"Click-through  (hold Alt to use)", ID_CLICKTHRU, PG_OPTIONS, Btn::Check);
+    hCaptureChk = btn(L"Hide overlays in screenshots", ID_CAPTURE_CHK, PG_OPTIONS, Btn::Check);
     // Experience
     {
         const wchar_t* t[6] = {L"CHARACTER NAME",      L"LEVEL",
@@ -290,21 +374,31 @@ void createControls() {
     hExpGain = pctEdit(gExpGain, ID_EXP_GAIN);
     for (HWND e : {hExpLevel, hExpArea}) SendMessageW(e, EM_LIMITTEXT, 3, 0);  // levels 1-100
     hExpRowLbl = label(
-        L"Exp to next level\r\nSafe range\r\nMonster base exp\r\nEffectiveness\r\nPenalty multiplier\r\n"
-        L"Experience gain\r\nExpected exp\r\nBest area",
+        L"Required exp to level up\r\nSafe range\r\nMonster base exp\r\nEffectiveness\r\nPenalty multiplier\r\n"
+        L"Experience gain\r\nExpected exp\r\nBest area\r\nLast level up\r\nTime between level ups\r\nExp per hour",
         ID_EXP_ROWLBL, fNormal, PG_EXPERIENCE, true);
     hExpInfo = label(L"", ID_EXP_INFO, fNormal, PG_EXPERIENCE, true);
-    hExpOvChk = btn(L"Show safe area level and exp bonus on MapTimerOverlay", ID_EXP_OVCHK, PG_EXPERIENCE, Btn::Check);
+    hExpOvChk = btn(L"Experience lines (area level, exp bonus, required exp, exp/h)", ID_EXP_OVCHK, PG_OPTIONS,
+                    Btn::Check);  // Options -> Overlays, MapTimerOverlay row
+    {
+        const wchar_t* lc[] = {L"#",          L"Zone",        L"Area Lvl",   L"Lvl before",
+                               L"Lvl after",  L"Time to lvl", L"Exp/h",      L"Leveled at"};
+        hLvlCmp = btn(L"Campaign", ID_LVL_CMP, PG_EXPERIENCE, Btn::Pill);
+        hLvlMaps = btn(L"Maps", ID_LVL_MAPS, PG_EXPERIENCE, Btn::Pill);
+        hLvlExport = btn(L"Export to CSV", ID_LVL_EXPORT, PG_EXPERIENCE, Btn::Accent);
+        hExpList = list(ID_EXP_LIST, PG_EXPERIENCE, lc, kLvlW, 8, 0b01111101);
+    }
     hExpHint = label(L"Enter your character name and the level updates by itself on every level up.", ID_EXP_HINT,
                      fNormal, PG_EXPERIENCE);
 
     hLblKeys =
-        label(L"HOTKEYS   \u00b7   campaign timer and layout screenshots, work while the game or this app is in front",
+        label(L"HOTKEYS   \u00b7   campaign timer, layout screenshots and steps, work while the game or this app is in front",
               ID_LBL_KEYS, fSection, PG_OPTIONS);
     hLayCropChk =
         btn(L"Select the area (snipping tool) instead of the whole game window", ID_LAY_CROP, PG_OPTIONS, Btn::Check);
     {
-        const wchar_t* names[HK_COUNT] = {L"Stop", L"Pause / resume", L"Start new run", L"Layout screenshot"};
+        const wchar_t* names[HK_COUNT] = {L"Stop",         L"Pause / resume", L"Start new run", L"Layout screenshot",
+                                          L"Complete step", L"Undo step"};
         for (int i = 0; i < HK_COUNT; ++i) {
             hKeyLbl[i] = label(names[i], ID_KEY_LBL0 + i, fNormal, PG_OPTIONS);
             hKeyBtn[i] = btn(hotkeyName(i).c_str(), ID_KEY_BTN0 + i, PG_OPTIONS, Btn::Normal);
@@ -332,8 +426,25 @@ void createControls() {
               ID_OPT_LBL, fNormal, PG_OPTIONS, true);
     hOptInfo = label(L"", ID_OPT_INFO, fNormal, PG_OPTIONS, true);
     createLayoutsPage();
+    createStepsPage();
 
-    for (HWND lv : {hHist, hSumList, hCmpList}) {
+    hNotesChk = btn(L"Show notes", ID_STEPS_NOTES, PG_OPTIONS, Btn::Check);  // StepsOverlay row
+    hZonesImport = btn(L"Load zone names...", ID_ZONES_IMPORT, PG_OPTIONS, Btn::Normal);
+    {
+        const wchar_t* pills[3] = {L"Overlays", L"Hotkeys", L"Theme"};
+        for (int i = 0; i < 3; ++i) hOptPill[i] = btn(pills[i], ID_OPT_PILL0 + i, PG_OPTIONS, Btn::Pill);
+        for (HWND h : {hLblOverlay, hOvGeneralLbl, hAlphaLbl, hAlphaSlider, hAlphaVal, hClickChk, hCaptureChk, hOvEachLbl,
+                       hOverlayChk, hRecLbl, hRecMinus, hRecVal, hRecPlus, hCmdChk, hGraphChk, hGraphOnlyChk, hStepsChk,
+                       hStepsLbl, hStepsMinus, hStepsVal, hStepsPlus, hNotesChk, hExpOvChk})
+            gOptGroup[h] = 0;
+        gOptGroup[hLblKeys] = 1;
+        gOptGroup[hLayCropChk] = 1;
+        for (int i = 0; i < HK_COUNT; ++i) gOptGroup[hKeyLbl[i]] = gOptGroup[hKeyBtn[i]] = 1;
+        for (HWND h : {hLblTheme, hThemeSel, hLblUpd, hUpdInfo}) gOptGroup[h] = 2;
+        gOptPill = std::clamp((int)GetPrivateProfileIntW(L"main", L"OptionsPill", 0, iniPath().c_str()), 0, 2);
+    }
+
+    for (HWND lv : {hHist, hSumList, hCmpList, hCmpActList, hExpList}) {
         gHiddenCols[lv] = (unsigned)GetPrivateProfileIntW(L"columns", listKey(lv), 0, iniPath().c_str());
         wchar_t sb[32];
         GetPrivateProfileStringW(L"sort", listKey(lv), L"-1,0", sb, 32, iniPath().c_str());

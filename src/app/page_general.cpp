@@ -1,5 +1,6 @@
 // Maps tab: current map, details and the maps of the session.
 #include "app.h"
+#include "area_tables.h"
 
 static int mapCategory(const std::string& a);
 static const wchar_t* abyssFaction(const std::string& id);
@@ -19,12 +20,13 @@ bool unnamed(const std::string& name, const std::string& id) { return name.empty
 // The game names all three Abyssal Depths variants the same; the id tells the faction (monsters per poe2db).
 static const wchar_t* abyssFaction(const std::string& id) {
     if (id == "Abyss_Depths1") return L"Amanamu";  // Lightless
-    if (id == "Abyss_Depths2") return L"Kurgal";   // Blackblooded
-    if (id == "Abyss_Depths3") return L"Ulaman";   // ... of the Pit
+    if (id == "Abyss_Depths2") return L"Kurgal";  // Blackblooded
+    if (id == "Abyss_Depths3") return L"Ulaman";  // ... of the Pit
     return nullptr;
 }
 
-// Display name of an area: the name from the log, otherwise a readable form of its ID; Abyssal Depths get their faction.
+// Display name of an area: its name in zones.txt, else the name from the log, otherwise its area id (campaign) or a readable form of it (maps);
+// Abyssal Depths get their faction.
 std::wstring areaName(const std::string& name, const std::string& id) {
     std::wstring n = areaNameRaw(name, id);
     if (const wchar_t* f = abyssFaction(id)) n += std::wstring(L" - ") + f;
@@ -32,11 +34,17 @@ std::wstring areaName(const std::string& name, const std::string& id) {
 }
 
 static std::wstring areaNameRaw(const std::string& name, const std::string& id) {
+    std::string tableName = zoneTable().name(id);  // zones.txt first (area_tables)
+    if (!tableName.empty()) return W(tableName);
     if (!unnamed(name, id)) return W(name);
+    if (Tracker::isCampaign(id)) return W(id);  // a campaign zone the log has not named yet: its area id (G5_1)
     std::string t = id.compare(0, 3, "Map") == 0 && id.size() > 3 ? id.substr(3) : id, out;
     for (size_t i = 0; i < t.size(); ++i) {  // "SinterRift" -> "Sinter Rift"
         char c = t[i];
-        if (c == '_') { out += ' '; continue; }
+        if (c == '_') {
+            out += ' ';
+            continue;
+        }
         if (i > 0 && isupper((unsigned char)c) && islower((unsigned char)t[i - 1])) out += ' ';
         out += c;
     }
@@ -54,7 +62,7 @@ void refreshUi() {
         std::wstring st = W(stateName(r.state));
         if (r.state == RunState::Paused) {
             if (r.inHideout) st += L"  -  back in hideout";
-            else st += L"  -  in " + W(g.locationName.empty() ? g.location : g.locationName);
+            else st += L"  -  in " + W(g.locationDisplay());
         }
         setTextIfChanged(hStatus, st);
         setTextIfChanged(hTimer, W(fmtDuration(r.activeAt(now))));
@@ -63,18 +71,18 @@ void refreshUi() {
             subs += (subs.empty() ? "" : ", ") + U8(areaName(g.nameOf(s.areaId), s.areaId)) + " " + fmtDuration(s.ms);
         char load[32];
         snprintf(load, sizeof load, "%.2f s", r.loadSec);
-        std::wstring d = W(r.areaId) + L"\r\n" + std::to_wstring(r.seed) + L"\r\n" + W(r.genTime) +
-                         L"     entered " + W(r.enterTime.empty() ? "-" : r.enterTime) + L"     load " + W(load) +
-                         L"     entries " + std::to_wstring(r.entries) + L"\r\n" +
-                         (r.hideoutId.empty() ? L"-"
-                                              : W((r.hideoutName.empty() ? r.hideoutId : r.hideoutName) + "     returns " +
-                                                  std::to_string(r.hideoutReturns) + "     time " + fmtDuration(r.hideoutAt(now)))) +
-                         L"\r\n" + (subs.empty() ? L"-" : W(subs));
+        std::wstring d =
+            W(r.areaId) + L"\r\n" + std::to_wstring(r.seed) + L"\r\n" + W(r.genTime) + L"     entered " +
+            W(r.enterTime.empty() ? "-" : r.enterTime) + L"     load " + W(load) + L"     entries " +
+            std::to_wstring(r.entries) + L"\r\n" +
+            (r.hideoutId.empty() ? L"-"
+                                 : W((r.hideoutName.empty() ? r.hideoutId : r.hideoutName) + "     returns " +
+                                     std::to_string(r.hideoutReturns) + "     time " + fmtDuration(r.hideoutAt(now)))) +
+            L"\r\n" + (subs.empty() ? L"-" : W(subs));
         setTextIfChanged(hDetails, d);
     } else {
         setTextIfChanged(hTitle, L"No active map");
-        setTextIfChanged(hStatus, gFileOk ? W("In " + (g.locationName.empty() ? (g.location.empty() ? std::string("-") : g.location)
-                                                                               : g.locationName))
+        setTextIfChanged(hStatus, gFileOk ? W("In " + (g.location.empty() ? std::string("-") : g.locationDisplay()))
                                           : L"Log file not found - set the path in \u2699 options");
         setTextIfChanged(hTimer, L"00:00");
         setTextIfChanged(hDetails, L"-\r\n-\r\n-\r\n-\r\n-");
@@ -98,9 +106,9 @@ void refreshUi() {
             if (gMapFilter != CAT_ALL && mapCategory(r.areaId) != gMapFilter) return;
             if (!searchMatch(hHist, areaName(r.name, r.areaId), W(r.areaId))) return;
             ++cnt;
-            rows.push_back({{std::to_wstring(no), areaName(r.name, r.areaId), std::to_wstring(r.level), W(r.areaId), std::to_wstring(r.seed),
-                             r.enterTime.empty() ? L"-" : W(r.enterTime), secs(r.loadSec), W(fmtDuration(t)),
-                             std::to_wstring(r.entries)},
+            rows.push_back({{std::to_wstring(no), areaName(r.name, r.areaId), std::to_wstring(r.level), W(r.areaId),
+                             std::to_wstring(r.seed), r.enterTime.empty() ? L"-" : W(r.enterTime), secs(r.loadSec),
+                             W(fmtDuration(t)), std::to_wstring(r.entries)},
                             r.id});
             ent += r.entries;
             ms += t;
@@ -127,14 +135,16 @@ void refreshUi() {
         setTextIfChanged(hSummary, sum);
         if (g.hasCurrent) InvalidateRect(hHist, nullptr, FALSE);  // live row colour (active / paused)
     }
-    if (g.areaNamesChanged) { g.areaNamesChanged = false; g.saveAreaNames(areasPath()); }
+    if (g.areaNamesChanged) {
+        g.areaNamesChanged = false;
+        g.saveAreaNames(areasPath());
+    }
     if (gPage == PG_CAMPAIGN) refreshCampaign(false);
 
-    setTextIfChanged(hOptInfo, std::wstring(gFileOk ? L"Reading log OK" : L"Log file NOT found") +
-                                   (gHistoryLoaded ? L"  \u00b7  history loaded" : L"  \u00b7  tracking new events only") + L"\r\n" +
-                                   std::to_wstring(gOffset / 1024) + L" KB, " + std::to_wstring(gLinesRead) + L" lines read\r\n" +
-                                   W(g.sessionStart.empty() ? "-" : g.sessionStart) + L"\r\n" +
-                                   W(g.locationName.empty() ? g.location : g.locationName) + L"\r\n" +
-                                   fileName(gMapFile.path) + L"\r\n" + fileName(gCmpFile.path) + L"\r\n" +
-                                   fileName(gSumFile.path));
+    setTextIfChanged(
+        hOptInfo, std::wstring(gFileOk ? L"Reading log OK" : L"Log file NOT found") +
+                      (gHistoryLoaded ? L"  \u00b7  history loaded" : L"  \u00b7  tracking new events only") + L"\r\n" +
+                      std::to_wstring(gOffset / 1024) + L" KB, " + std::to_wstring(gLinesRead) + L" lines read\r\n" +
+                      W(g.sessionStart.empty() ? "-" : g.sessionStart) + L"\r\n" + W(g.locationDisplay()) + L"\r\n" +
+                      fileName(gMapFile.path) + L"\r\n" + fileName(gCmpFile.path) + L"\r\n" + fileName(gSumFile.path));
 }

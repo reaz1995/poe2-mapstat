@@ -25,6 +25,7 @@ HWND hGenReset, hExpGen;
 HWND hSumHdr, hSumList, hSumReset, hExpSum, hLblSum;
 
 HWND hCmpTitle, hCmpTimer, hCmpStatus, hCmpList, hCmpReset, hExpCmp, hLblCmp, hCmpSum;
+HWND hCmpActList = nullptr;
 
 HWND hLblPath, hPath, hBrowse, hReload, hOnTop, hOptInfo, hOptLbl, hLoadHist, hRestoreGen, hRestoreCmp;
 
@@ -49,7 +50,7 @@ bool gStartInTray = true, gExiting = false;
 UINT gTaskbarCreated = 0;  // explorer restarted -> add the tray icon again
 
 HWND hLblOverlay, hRecLbl, hRecMinus, hRecVal, hRecPlus, hCloseChk, hExitBtn;
-HWND hAlphaLbl, hAlphaMinus, hAlphaVal, hAlphaPlus;
+HWND hAlphaLbl, hAlphaSlider, hAlphaVal, hOvGeneralLbl, hOvEachLbl;
 
 HWND hCmdChk, hCmdBar = nullptr;
 
@@ -60,9 +61,9 @@ HWND hLblUpd = nullptr, hUpdChk = nullptr, hUpdInfo = nullptr, hUpdTab = nullptr
 bool gAutoUpdate = true;
 HWND hCmpTimerLoad = nullptr;
 HWND hCmpPause = nullptr, hCmpStop = nullptr;
-HWND hLblKeys = nullptr, hKeyLbl[4] = {}, hKeyBtn[4] = {};
+HWND hLblKeys = nullptr, hKeyLbl[HK_COUNT] = {}, hKeyBtn[HK_COUNT] = {};
 HWND hTabExp, hExpName, hExpLevel, hExpArea, hExpTabEff, hExpMapEff, hExpGain, hExpInfo, hExpRowLbl, hExpOvChk,
-    hExpHint;
+    hExpHint, hExpList, hLvlCmp, hLvlMaps, hLvlExport;
 
 HANDLE gMutex = nullptr;
 

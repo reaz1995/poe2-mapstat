@@ -15,7 +15,8 @@ void initDarkMode() {
 }
 
 void darkControl(HWND h) {
-    static auto allow = (BOOL(WINAPI*)(HWND, BOOL))(void*)GetProcAddress(LoadLibraryW(L"uxtheme.dll"), MAKEINTRESOURCEA(133));
+    static auto allow =
+        (BOOL(WINAPI*)(HWND, BOOL))(void*)GetProcAddress(LoadLibraryW(L"uxtheme.dll"), MAKEINTRESOURCEA(133));
     if (allow) allow(h, gTheme.dark);
     SetWindowTheme(h, gTheme.dark ? L"DarkMode_Explorer" : L"Explorer", nullptr);  // scrollbars
 }
@@ -94,21 +95,26 @@ void setThemeColors() {
 
 // switch theme while running: colours, fonts, light/dark controls, repaint everything
 static void applyTheme() {
-    struct Swap { HFONT from[6], to[6]; } sw;
+    struct Swap {
+        HFONT from[6], to[6];
+    } sw;
     HFONT* fs[6] = {&fNormal, &fBold, &fTab, &fSection, &fTitle, &fTimer};
     for (int i = 0; i < 6; ++i) sw.from[i] = *fs[i];
     setThemeColors();
     makeFonts();
     for (int i = 0; i < 6; ++i) sw.to[i] = *fs[i];
-    EnumChildWindows(hMain, [](HWND c, LPARAM lp) -> BOOL {
-        auto* s = (Swap*)lp;
-        HFONT f = (HFONT)SendMessageW(c, WM_GETFONT, 0, 0);
-        for (int i = 0; i < 6; ++i)
-            if (f == s->from[i]) SendMessageW(c, WM_SETFONT, (WPARAM)s->to[i], FALSE);
-        return TRUE;
-    }, (LPARAM)&sw);
+    EnumChildWindows(
+        hMain,
+        [](HWND c, LPARAM lp) -> BOOL {
+            auto* s = (Swap*)lp;
+            HFONT f = (HFONT)SendMessageW(c, WM_GETFONT, 0, 0);
+            for (int i = 0; i < 6; ++i)
+                if (f == s->from[i]) SendMessageW(c, WM_SETFONT, (WPARAM)s->to[i], FALSE);
+            return TRUE;
+        },
+        (LPARAM)&sw);
     for (HFONT f : sw.from) DeleteObject(f);
-    for (HWND lv : {hHist, hSumList, hCmpList}) {
+    for (HWND lv : {hHist, hSumList, hCmpList, hExpList}) {
         ListView_SetBkColor(lv, C::Card);
         ListView_SetTextBkColor(lv, C::Card);
         ListView_SetTextColor(lv, C::Fg);
@@ -120,14 +126,17 @@ static void applyTheme() {
     if (fOvHead) ovFonts(gOvScale);
     SetWindowPos(hMain, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
     RedrawWindow(hMain, nullptr, nullptr, RDW_ERASE | RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN);
-    if (hOverlay) InvalidateRect(hOverlay, nullptr, TRUE);
-    if (hCmdBar) InvalidateRect(hCmdBar, nullptr, TRUE);
+    stepsOverlayRefresh();  // its fonts changed too: height again
+    for (HWND ov : {hOverlay, hCmdBar, hGraphOv, hStepsOv})  // repainted now, not at their next move
+        if (ov) RedrawWindow(ov, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_UPDATENOW);
     updateThemeLabel();
 }
 
 // theme selector: built-in themes, Default at the bottom
 void themeMenu() {
-    struct Item { std::string key, name; };
+    struct Item {
+        std::string key, name;
+    };
     std::vector<Item> items;
     for (int i = 0; i < kEmbeddedThemeCount; ++i) {
         std::string key = kEmbeddedThemes[i].file;
@@ -150,8 +159,8 @@ void themeMenu() {
     mi.hbrBack = brCard;
     SetMenuInfo(m, &mi);
     for (size_t i = 0; i < gMenuItems.size(); ++i)
-        AppendMenuW(m, MF_OWNERDRAW | (gMenuItems[i].separator ? MF_DISABLED : 0), gMenuItems[i].separator ? 0 : 100 + i,
-                    (LPCWSTR)&gMenuItems[i]);
+        AppendMenuW(m, MF_OWNERDRAW | (gMenuItems[i].separator ? MF_DISABLED : 0),
+                    gMenuItems[i].separator ? 0 : 100 + i, (LPCWSTR)&gMenuItems[i]);
     RECT br;
     GetWindowRect(hThemeSel, &br);
     int cmd = TrackPopupMenu(m, TPM_RETURNCMD | TPM_LEFTBUTTON, br.left, br.bottom + 2, 0, hMain, nullptr);

@@ -26,19 +26,19 @@ struct Run {
     std::string areaId, name;
     int level = 0;
     uint32_t seed = 0;
-    std::string date;                                   // "2026/11/01" (log date of generation)
+    std::string date;  // "2026/11/01" (log date of generation)
     std::string genTime, enterTime, endTime;  // wall clock "HH:MM:SS"
     uint32_t segStartTick = 0;
     bool inSegment = false;
-    uint64_t activeMs = 0;      // closed segments only
-    uint32_t countedTick = 0;   // log tick up to which activeMs counts (re-reading older lines adds nothing)
+    uint64_t activeMs = 0;  // closed segments only
+    uint32_t countedTick = 0;  // log tick up to which activeMs counts (re-reading older lines adds nothing)
     double loadSec = 0;
     int entries = 0;
-    std::vector<SubVisit> subs;     // sub-areas visited during this run (one per instance)
-    std::string hideoutId, hideoutName;   // where the map was opened from
-    bool inHideout = false;               // currently back at that hideout
+    std::vector<SubVisit> subs;  // sub-areas visited during this run (one per instance)
+    std::string hideoutId, hideoutName;  // where the map was opened from
+    bool inHideout = false;  // currently back at that hideout
     uint32_t hideoutStartTick = 0;
-    uint64_t hideoutMs = 0;               // time spent back in that hideout while paused
+    uint64_t hideoutMs = 0;  // time spent back in that hideout while paused
     int hideoutReturns = 0;
     uint64_t hideoutAt(uint32_t nowTick) const {
         return hideoutMs + (inHideout ? (uint32_t)(nowTick - hideoutStartTick) : 0);
@@ -63,8 +63,9 @@ struct Zone {
     uint64_t activeMs = 0;
     int entries = 0;
     double loadSec = 0;
-    uint32_t leftTick = 0;   // tick of the last exit from the zone
-    bool closed = false;     // instance expired -> never resumed
+    uint32_t leftTick = 0;  // tick of the last exit from the zone
+    std::string lastLeft;   // log time of the last exit (21:13:15)
+    bool closed = false;  // instance expired -> never resumed
     uint64_t activeAt(uint32_t nowTick) const {
         return activeMs + (inSegment ? (uint32_t)(nowTick - segStartTick) : 0);
     }
@@ -74,22 +75,22 @@ const char* stateName(RunState s);
 
 class Tracker {
 public:
-    std::vector<Run> history;       // finished runs, oldest first
+    std::vector<Run> history;  // finished runs, oldest first
     bool hasCurrent = false;
     Run cur;
     std::string location;  // areaId the player is in now
     std::string locationName;  // display name from the loading screen
     std::string sessionStart;  // first timestamp of the log
     uint32_t lastTick = 0;
-    std::string homeId, homeName;   // last hideout seen (the map's starting point)
-    bool inHideoutNow = false;      // standing in a hideout right now (any hideout)
-    int locationLevel = 0;          // area level of where the player is now
-    uint32_t hideoutStayTick = 0;   // when the current hideout stay started
+    std::string homeId, homeName;  // last hideout seen (the map's starting point)
+    bool inHideoutNow = false;  // standing in a hideout right now (any hideout)
+    int locationLevel = 0;  // area level of where the player is now
+    uint32_t hideoutStayTick = 0;  // when the current hideout stay started
     std::string lastTime;
     std::function<void()> onHistoryChanged;
-    std::function<void(const std::string& name, int level)> onLevelUp;  // ": Name (Class) is now level N"
+    std::function<void(const std::string& name, int level, const LogLine& l)> onLevelUp;  // ": Name (Class) is now level N"
     bool sawLoadingScreen = false;  // this log session has [LOADING SCREEN] lines (older game versions don't);
-                                    // set from outside when reading starts in the middle of a log
+        // set from outside when reading starts in the middle of a log
 
     // Campaign zones
     std::map<std::string, std::string> areaNames;  // areaId -> display name (learned from [SCENE] lines)
@@ -100,12 +101,19 @@ public:
     // "46-51" for a zone that follows the character level (built-in list, else the range seen), "" for fixed ones
     std::string levelRange(const std::string& areaId) const;
     bool areaNamesChanged = false;
+    bool tablesChanged = false;  // a new zone / act id was added to the area tables (area_tables.h)
     bool loadAreaNames(const std::string& path);
     bool saveAreaNames(const std::string& path) const;
     std::string nameOf(const std::string& areaId) const;
+    // Name of the area the player is in: its loading-screen name once that loading screen is over, until then
+    // (and right after a teleport, when locationName is still the previous area) the name known for its id.
+    std::string locationDisplay() const {
+        return locationLoaded && !locationName.empty() ? locationName : nameOf(location);
+    }
+    bool locationIsLoaded() const { return locationLoaded; }
 
-    std::vector<Zone> zones;        // in order of first visit
-    int curZone = -1;               // index into zones, -1 = not in campaign
+    std::vector<Zone> zones;  // in order of first visit
+    int curZone = -1;  // index into zones, -1 = not in campaign
     // Same area+seed re-entered within this time after leaving -> time is added to the same row.
     // Later -> new row (towns always have seed 1, so this splits town time into separate runs).
     static constexpr uint32_t kResumeWindowMs = 60 * 60 * 1000;
@@ -113,7 +121,7 @@ public:
 
     // "Reset Campaign Run" / start after a stop: a clean run from zero. A campaign zone the player is in
     // right now becomes its first row.
-    std::string campaignStartTime;   // wall clock of the reset (or first zone)
+    std::string campaignStartTime;  // wall clock of the reset (or first zone)
     void resetCampaign(uint32_t tick, const std::string& time);
 
     // Campaign clock, controlled by the user (hotkeys and buttons on the Campaign tab).
@@ -137,15 +145,15 @@ public:
     void resetSummary();
     // Runs counted in Summary with their time, each map instance once.
     std::vector<std::pair<const Run*, uint64_t>> summaryRuns(uint32_t nowTick) const;
-    static bool isCampaign(const std::string& area);   // G1_2, G1_town, C_G2_3, P1_1 ...
+    static bool isCampaign(const std::string& area);  // G1_2, G1_town, C_G2_3, P1_1 ...
     static std::string actOf(const std::string& area);  // "Act 1", "Act 2 (Cruel)", ...
 
     // Restore map session / Load past events: the Maps list comes from `src`. Runs counted in Summary
     // so far move to summaryArchive, the new runs are added to Summary. Campaign and the live state stay.
     void replaceMaps(const Tracker& src);
-    void reset();                   // clears all data
-    void resetSession();            // new log / app start: drop transient state, keep stored runs & zones
-    void suspend(uint32_t nowTick); // app closing / game restarted: close the open map and zone timers
+    void reset();  // clears all data
+    void resetSession();  // new log / app start: drop transient state, keep stored runs & zones
+    void suspend(uint32_t nowTick);  // app closing / game restarted: close the open map and zone timers
 
     // Logged out (or the game was closed) and back into the same area within this time: the time away
     // counts for that map, zone or hideout stay. Longer breaks are not counted.
@@ -175,19 +183,19 @@ public:
 private:
     enum class Pending { None, Run, SubArea, Safe, Zone };
     void closeZone(uint32_t tick);
-    bool sceneNamePending = false;   // take area name from first [SCENE] line after Generating
-    int curSub = -1;                 // index into cur.subs while standing in a sub-area
+    bool sceneNamePending = false;  // take area name from first [SCENE] line after Generating
+    int curSub = -1;  // index into cur.subs while standing in a sub-area
     Pending pending = Pending::None;
     bool inSafe = true;
     int nextId = 1;
     uint32_t locationSeed = 0;
-    bool locationLoaded = false;     // the loading screen of `location` is over
+    bool locationLoaded = false;  // the loading screen of `location` is over
 
     // Logout / game restart: where the player was, so returning to the same area can count the time away.
     bool offline = false;
     uint32_t offTick = 0, offSeed = 0, offStayTick = 0;
     std::string offArea;
-    uint64_t returnGap = 0;          // time away to add when the area being loaded is the one left
+    uint64_t returnGap = 0;  // time away to add when the area being loaded is the one left
     void goOffline(uint32_t tick);
 
     void closeSegment(uint32_t tick);
@@ -195,6 +203,11 @@ private:
     void finish(EndReason r, const LogLine* l);
     void startRun(const std::string& area, int level, uint32_t seed, const LogLine& l);
     void onGenerate(const std::string& area, int level, uint32_t seed, const LogLine& l);
+
+public:
+    int areasEntered = 0;  // "Generating level" lines seen (any area)
+
+private:
     void onLoaded(const std::string& name, double sec, const LogLine& l);
     void onDisconnect(const LogLine& l);
 };

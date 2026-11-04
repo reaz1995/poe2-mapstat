@@ -12,7 +12,7 @@ static LRESULT CALLBACK ListProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PT
 // search box in the header of the name column (Maps, Summary, Campaign): filters rows by name or Area ID
 static std::map<HWND, HWND> gSearchEdit;  // list -> edit
 
-static std::map<HWND, std::wstring> gSearch;    // list -> lower-case text
+static std::map<HWND, std::wstring> gSearch;  // list -> lower-case text
 
 bool searchMatch(HWND lv, const std::wstring& name, const std::wstring& id) {
     const std::wstring& q = gSearch[lv];
@@ -29,9 +29,13 @@ static bool numKey(const std::wstring& s, double& v) {
         double t = 0, part = 0;
         bool any = false;
         for (wchar_t ch : s) {
-            if (ch >= L'0' && ch <= L'9') { part = part * 10 + (ch - L'0'); any = true; }
-            else if (ch == L':') { t = t * 60 + part; part = 0; }
-            else return false;
+            if (ch >= L'0' && ch <= L'9') {
+                part = part * 10 + (ch - L'0');
+                any = true;
+            } else if (ch == L':') {
+                t = t * 60 + part;
+                part = 0;
+            } else return false;
         }
         v = t * 60 + part;
         return any;
@@ -90,10 +94,16 @@ void fitColumns(HWND lv, const int* weights, int n) {
     unsigned hidden = gHiddenCols[lv];
     int sum = 0, last = -1;
     for (int i = 0; i < n; ++i)
-        if (!((hidden >> i) & 1)) { sum += weights[i]; last = i; }
+        if (!((hidden >> i) & 1)) {
+            sum += weights[i];
+            last = i;
+        }
     int used = 0;
     for (int i = 0; i < n; ++i) {
-        if ((hidden >> i) & 1) { ListView_SetColumnWidth(lv, i, 0); continue; }
+        if ((hidden >> i) & 1) {
+            ListView_SetColumnWidth(lv, i, 0);
+            continue;
+        }
         int w = i == last ? avail - used : weights[i] * avail / std::max(sum, 1);
         ListView_SetColumnWidth(lv, i, w);
         used += w;
@@ -127,12 +137,20 @@ void loadColumnOrder(HWND lv) {
         if (!seen[c]) o.push_back(c);
     ListView_SetColumnOrderArray(lv, n, o.data());
 }
-const wchar_t* listKey(HWND lv) { return lv == hHist ? L"General" : lv == hSumList ? L"Summary" : L"Campaign"; }
+const wchar_t* listKey(HWND lv) {
+    return lv == hHist         ? L"General"
+           : lv == hSumList    ? L"Summary"
+           : lv == hExpList    ? L"LevelUps"
+           : lv == hCmpActList ? L"CampaignActs"
+                               : L"Campaign";
+}
 
 static void relayoutLists() {
     fitColumns(hHist, kHistW, 9);
     fitColumns(hSumList, kSumW, 7);
     fitColumns(hCmpList, kCmpW, 11);
+    fitColumns(hCmpActList, kCmpActW, 7);
+    fitColumns(hExpList, kLvlW, 8);
 }
 
 // ---- search box inside the list header
@@ -212,7 +230,8 @@ static LRESULT CALLBACK ListProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PT
     }
     if (h == hSumList) {
         if (msg == WM_MOUSEMOVE) summaryHover(h, lp);
-        else if (msg == WM_MOUSELEAVE || msg == WM_MOUSEWHEEL || msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN) hideTip();
+        else if (msg == WM_MOUSELEAVE || msg == WM_MOUSEWHEEL || msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN)
+            hideTip();
     }
     if (msg == WM_NOTIFY) {
         NMHDR* nh = (NMHDR*)lp;
@@ -287,7 +306,7 @@ static LRESULT CALLBACK ListProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PT
     return DefSubclassProc(h, msg, wp, lp);
 }
 
-std::vector<MenuItem> gMenuItems;   // owner-draw item data (kept alive while the menu is open)
+std::vector<MenuItem> gMenuItems;  // owner-draw item data (kept alive while the menu is open)
 
 void showColumnMenu(HWND lv, int col) {
     int n = Header_GetItemCount(ListView_GetHeader(lv));
@@ -330,8 +349,10 @@ void showColumnMenu(HWND lv, int col) {
         AppendMenuW(m, MF_OWNERDRAW | MF_DISABLED, 0, (LPCWSTR)&gMenuItems[4]);
     }
     UINT noCol = col < 0 ? MF_GRAYED : 0;
-    AppendMenuW(m, MF_OWNERDRAW | noCol | ((st.col == col && !st.desc) ? MF_CHECKED : 0), 10, (LPCWSTR)&gMenuItems[base + 0]);
-    AppendMenuW(m, MF_OWNERDRAW | noCol | ((st.col == col && st.desc) ? MF_CHECKED : 0), 11, (LPCWSTR)&gMenuItems[base + 1]);
+    AppendMenuW(m, MF_OWNERDRAW | noCol | ((st.col == col && !st.desc) ? MF_CHECKED : 0), 10,
+                (LPCWSTR)&gMenuItems[base + 0]);
+    AppendMenuW(m, MF_OWNERDRAW | noCol | ((st.col == col && st.desc) ? MF_CHECKED : 0), 11,
+                (LPCWSTR)&gMenuItems[base + 1]);
     AppendMenuW(m, MF_OWNERDRAW | (st.col >= 0 ? 0 : MF_GRAYED), 12, (LPCWSTR)&gMenuItems[base + 2]);
     AppendMenuW(m, MF_OWNERDRAW | MF_DISABLED, 0, (LPCWSTR)&gMenuItems[base + 3]);
     AppendMenuW(m, MF_OWNERDRAW | ((col < 0 || visible <= 1) ? MF_GRAYED : 0), 1, (LPCWSTR)&gMenuItems[base + 4]);
@@ -355,7 +376,8 @@ void showColumnMenu(HWND lv, int col) {
                                    iniPath().c_str());
         InvalidateRect(ListView_GetHeader(lv), nullptr, TRUE);
         if (lv == hSumList) refreshSummary();
-        else if (lv == hCmpList) refreshCampaign(false);
+        else if (lv == hCmpList || lv == hCmpActList) refreshCampaign(true);
+        else if (lv == hExpList) expListChanged();
         else refreshUi();
         if (ListView_GetItemCount(lv)) ListView_EnsureVisible(lv, 0, FALSE);
         return;
@@ -363,7 +385,8 @@ void showColumnMenu(HWND lv, int col) {
     if (cmd == 1) gHiddenCols[lv] |= 1u << col;
     if (cmd == 2) gHiddenCols[lv] = 0;
     if (cmd) {
-        WritePrivateProfileStringW(L"columns", listKey(lv), std::to_wstring(gHiddenCols[lv]).c_str(), iniPath().c_str());
+        WritePrivateProfileStringW(L"columns", listKey(lv), std::to_wstring(gHiddenCols[lv]).c_str(),
+                                   iniPath().c_str());
         relayoutLists();
     }
 }
@@ -398,7 +421,8 @@ LRESULT listCustomDraw(NMLVCUSTOMDRAW* cd) {
 }
 
 HWND list(int id, int page, const wchar_t* const* cols, const int* widths, int n, unsigned rightMask) {
-    HWND lv = mk(WC_LISTVIEWW, L"", LVS_REPORT | LVS_SHOWSELALWAYS | LVS_SINGLESEL, id, fNormal, page);  // header buttons on: needed for dragging columns
+    HWND lv = mk(WC_LISTVIEWW, L"", LVS_REPORT | LVS_SHOWSELALWAYS | LVS_SINGLESEL, id, fNormal,
+                 page);  // header buttons on: needed for dragging columns
     ListView_SetExtendedListViewStyle(lv, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_HEADERDRAGDROP);
     ListView_SetBkColor(lv, C::Card);
     ListView_SetTextBkColor(lv, C::Card);

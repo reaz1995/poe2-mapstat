@@ -1,0 +1,614 @@
+# Poe2 | MapStat - campaign walkthrough: Acts 1-4 and the Interludes
+# Made from the game's quest data (Quest, QuestStates, QuestRewardOffers, QuestRewards, WorldAreas, MonsterVarieties)
+# and, for Act 4, a leveling sheet. (op) = optional. Lines under a step: boss and reward ("or" = pick one).
+# League content (Expedition runestones, Incursion beacons, Abyss) is left out.
+# "+ Act N" ... "+": a section, double-click it in the editor to fold / unfold.
+# Quest: the quest the step completes.
+
++ Act 1
+The Riverbank
+  Kill The Bloated Miller
+  Go to Clearfell Encampment
+
+Clearfell Encampment
+  Talk to Renly
+    Quest: Reaching Clearfell
+    Reward: Uncut Skill Gem
+
+Clearfell
+  (op) Beira of the Rotten Pack
+    Boss
+  (op) Find the Mud Burrow
+  Find The Grelwood
+
+Mud Burrow
+  (op) Kill The Devourer
+    Quest: Treacherous Ground
+    Reward from Renly: Uncut Support Gem
+
+The Grelwood
+  (op) The Brambleghast
+    Boss
+  Find the Tree of Souls, summon Una
+  Find The Red Vale
+
+The Red Vale
+  Activate the 3 Obelisks of Rust, collect the Runes of Power
+  Kill The Rust King (guards the last rune)
+  Back to town
+
+Clearfell Encampment
+  Give the runes to Renly, take the Rune Spikes
+
+The Grelwood
+  Stab the 3 Rune Spikes into the Tree of Souls
+    Quest: Secrets in the Dark
+    The Hooded One is released
+  Find The Grim Tangle
+
+Clearfell Encampment
+  Talk to Una
+
+The Grim Tangle
+  Summon Una to clear the roots
+  Kill The Rotten Druid
+  Go to Cemetery of the Eternals
+
+Cemetery of the Eternals
+  Talk to Lachlann
+  Find the Tomb of the Consort and the Mausoleum of the Praetor
+
+Tomb of the Consort
+  Kill Asinia, the Praetor's Consort
+    Pick up her Memorial Key Piece
+
+Mausoleum of the Praetor
+  Kill Draven, the Eternal Praetor
+    Pick up his Memorial Key Piece
+
+Cemetery of the Eternals
+  Open the Memorial Gate, follow Lachlann
+  Kill Lachlann of Endless Lament
+    Quest: Sorrow Among Stones
+    Reward: Uncut Support Gem, Count Lachlann's ring
+  Go to Hunting Grounds
+
+Clearfell Encampment
+  Give the ring to Una, watch the Hooded One revive
+    Quest: The Mysterious Shade
+
+Hunting Grounds
+  (op) Talk to Delwyn, follow the Spirit, kill the Hunted Monster
+    Quest: The Hunt Begins
+  (op) The Crowbell
+    Boss
+  (op) Find Freythorn
+  Find Ogham Farmlands
+
+Freythorn
+  (op) Cleanse the Ritual Altars, kill the King in the Mists
+    Quest: Ominous Altars
+    Reward from Finn: Ruby, Sapphire or Topaz Charm
+
+Ogham Farmlands
+  (op) Find Una's lute in her home
+    Quest: The Lost Lute
+    Reward from Una: Book of Specialisation (2 weapon set passive points)
+  Find Ogham Village
+
+Ogham Village
+  (op) Find Renly's tools
+    Quest: Finding the Forge
+    Reward: Renly's salvage bench
+  Kill The Executioner, free Leitis
+    Quest: The Trail of Corruption
+    Reward: Uncut Skill Gem
+  Go to The Manor Ramparts
+
+The Manor Ramparts
+  Go to Ogham Manor
+
+Ogham Manor
+  Kill Candlemass, the Living Rite
+  Kill Count Geonor in the pit below the Manor
+    Quest: The Mad Wolf of Ogham
+    Reward: Uncut Support Gem
+  Talk to the Hooded One in town, travel to Vastiri Outskirts
++
+
++ Act 2
+Vastiri Outskirts
+  Kill the Sun Clan hyenas and Rathbreaker
+  Talk to Zarka
+    Quest: Earning Passage
+    Reward: Uncut Skill Gem
+  Enter The Ardura Caravan
+
+The Ardura Caravan
+  Talk to the Hooded One, Sekhema Asala
+  Use the Desert Map: Mawdun Quarry
+  Notes
+    Desert Map: travel between the areas of the act
+    (op) Ancient Vows: find the Sun Clan and Kabala Clan Relics, put both in the altar
+      pick a permanent reward from one clan
+
+Mawdun Quarry
+  Go to Mawdun Mine
+
+Mawdun Mine
+  Kill Rudja, the Dread Engineer
+  Question the Faridun defector (Risu)
+  Back to town, talk to Asala
+
+The Ardura Caravan
+  Talk to Risu about the locked Halani Gates, then Asala
+  Desert Map: Traitor's Passage
+
+Traitor's Passage
+  Kill Balbala, the Traitor
+    Reward: Balbala's Barya (Trial of the Sekhemas)
+  Go to The Halani Gates
+
+The Halani Gates
+  Help Asala open the 3 gate mechanisms
+  Kill Jamanra, the Risen King
+  The sandstorm blocks the way: talk to Zarka
+
+The Ardura Caravan
+  Talk to Zarka and Asala: the Horn of the Vastiri
+  Notes
+    Horn of the Vastiri: Essence of Water (Keth), Mastodon Tusks (Bone Pits), Flame Ruby (Titan Grotto)
+
+Keth
+  (op) Kabala, Constrictor Queen
+    Boss
+  Go to The Lost City
+
+The Lost City
+  Go to Buried Shrines
+
+Buried Shrines
+  Kill Azarian, the Forsaken Son
+  Burn the Water Goddess with the Everburning Cinders
+  Pick up the Essence of Water
+    Quest: The City of Seven Waters
+    Reward from Zarka: Uncut Support Gem
+
+Mastodon Badlands
+  Find The Bone Pits
+  (op) Lightless Passage: the Well of Souls
+    Quest: The Well of Souls
+
+The Bone Pits
+  Kill Ekbab, Ancient Steed and Iktab, the Deathlord
+  Pick up the Mastodon Tusks
+    Quest: A Theft of Ivory
+    Reward from Zarka: Uncut Support Gem
+
+Valley of the Titans
+  Activate the Ancient Seals
+  Enter The Titan Grotto
+
+The Titan Grotto
+  Invoke the Rite of Flame at the cerulean altar
+  Kill Zalmarath, the Colossus, pick up the Flame Ruby
+    Quest: A Crown of Stone
+    Reward from Zarka: Uncut Support Gem
+
+The Ardura Caravan
+  Take the Horn of the Vastiri from Zarka
+    Reward: Uncut Skill Gem
+  Desert Map: the sandstorm, sound the Horn
+  Desert Map: Deshar
+
+Trial of the Sekhemas
+  (op) Place Balbala's Barya in the Relic Altar, complete the trial
+    Quest: Ascent to Power
+    Boss: Rattlecage, the Earthbreaker
+    Reward: Ascendancy (Altar of Ascendancy)
+
+Deshar
+  (op) Check the base of each tower for the final letter
+    Quest: Tradition's Toll
+    Reward from Shambrin: Book of Specialisation
+  Go to Path of Mourning
+
+Path of Mourning
+  Go to The Spires of Deshar
+
+The Spires of Deshar
+  Kill Tor Gul, the Defiler
+  Back to town, talk to Asala
+
+The Ardura Caravan
+  Desert Map: Dreadnought
+
+The Dreadnought's Wake
+  Go to Dreadnought
+
+Dreadnought
+  Fight to the cage behind the throne
+  Kill Jamanra, the Abomination
+    Quest: The Trail of Corruption
+  Back to town: the Hooded One's shrine (north-west, on foot)
+  Talk to Asala: travel to Sandswept Marsh
++
+
++ Act 3
+Sandswept Marsh
+  (op) Rootdredge
+    Boss
+  Find the treasure hunters' camp on the ziggurat
+
+Ziggurat Encampment
+  Talk to the Hooded One
+  Go to Jungle Ruins
+
+Jungle Ruins
+  (op) Mighty Silverfist
+    Boss
+  (op) Find The Venom Crypts
+  Find the stone altar, summon Alva
+  Go to Infested Barrens
+
+The Venom Crypts
+  (op) Search the corpse, pick up the Corpse-snake Venom
+    Quest: The Slithering Dead
+    Reward from Servi: Venom Draught of Stone, the Veil or Clarity
+    Reward: Artificer's Orb
+
+Infested Barrens
+  Talk to Servi about a Soul Core
+  Go to Chimeral Wetlands
+
+Chimeral Wetlands
+  Kill Xyclucian, the Chimera (guards the Machinarium)
+  (op) The Temple of Chaos: Trial of Chaos with an Inscribed Ultimatum
+    Quest: The Trials of Chaos
+    Reward: 2 Ascendancy points
+  Enter Jiquani's Machinarium
+
+Jiquani's Machinarium
+  Find a small Soul Core, open the stone door
+  Kill Blackjaw, the Remnant
+  Go to Jiquani's Sanctum
+
+Jiquani's Sanctum
+  Summon Alva at the symbol on the floor
+  Power the 2 Generators with medium Soul Cores
+  Kill Zicoatl, Warden of the Core
+  Pick up the Large Soul Core
+
+Jungle Ruins
+  Activate the stone altar with the Large Soul Core
+  Go to The Matlan Waterways
+
+The Matlan Waterways
+  Drain the area with the control mechanisms
+  (op) Find The Azak Bog
+  Back to town, take the south-west stairs down
+
+The Azak Bog
+  (op) Kill Ignagduk, the Bog Witch, pick up her Ghastly Spear
+    Quest: Tribal Vengeance
+    Reward from Servi: Thawing, Staunching, Antidote, Dousing or Grounding Charm
+
+The Drowned City
+  (op) Find The Molten Vault
+  Find Apex of Filth
+
+The Molten Vault
+  (op) Kill Mektul, the Forgemaster, pick up the Hammer of Kamasa
+    Quest: Treasures of Utzaal
+    Reward from Oswald: Uncut Skill Gem, Artificer's Orb, Reforging Bench
+
+Apex of Filth
+  Kill The Queen of Filth
+  Pick up the Temple Door Idol
+
+Ziggurat Encampment
+  Show the Idol to Alva, open the Temple of Kopec
+
+Temple of Kopec
+  Kill Ketzuli, High Priest of the Sun
+  Talk to Alva, ride the elevator up
+  Enter the Time Portal
+
+Utzaal
+  Kill Viper Napuatzi
+  Go to Aggorat
+
+Aggorat
+  Find The Black Chambers
+
+The Black Chambers
+  Kill Doryani's Triumph
+  Capture Doryani, Royal Thaumaturge
+
+Ziggurat Encampment
+  Talk to Doryani
+  Gateway to the Past: survive the Cataclysm, back to the Present
+  Talk to Alva: travel to Kingsmarch
+    Quest: Legacy of the Vaal
++
+
++ Act 4
+Kingsmarch
+  Talk to Doryani, then Alva
+  Take the Boat Charter from Rog, show it to Makoru
+  Sail to Kedge Bay
+  Notes
+    Makoru sails to any island, do them in any order
+    Weapon pieces: Singing Caverns, Shrike Island, Solitary Confinement
+    Torn Map Pieces: bring all 4 to Makoru (or Dannig) for Plunder's Point
+
+Kedge Bay
+  (op) Abandoned Ship
+    Loot
+  (op) Tidal Kay
+    Rare + ambush
+  (op) Dead Man's Chest
+    1st Torn Map Piece
+  Go to Journey's End
+
+Journey's End
+  (op) Exploding Ship
+  The Captain's Chair
+    Boss: Captain Hartlin
+    Reward: Verisium Ingots - take them to Dannig in Kingsmarch
+  (op) Free Freya Hartlin with the Verisium Spikes from Dannig
+    Quest: Dark Mists
+    Boss: Omniphobia, Fear Manifest
+    Reward from Tujen: Mist-shrouded Tome + Uncut Skill Gem
+
+Whakapanu Island
+  (op) Abandoned Homes
+    Lore
+  (op) Shark Pit
+    Quest: Tribal Medicine
+    Boss: Great White One - pick up its Shark Fin
+    Reward from Kaimana: Kaom's Lesson or Rakiata's Lesson
+  (op) Petrified Pirate
+    2nd Torn Map Piece
+  Go to Singing Caverns
+
+Singing Caverns
+  (op) Crabshell Cavern
+    Rare (level 4 support gem?)
+  (op) Beckoning Clam
+    Quest: Siren Pearl
+    Humming Pearl
+    Reward: Pearlescent Amulet
+  (op) Broodchamber
+    Loot eggs
+  Chamber of Echoes
+    Quest: Whakapanu Island
+    Boss: Diamora, Song of Death
+    Reward: Weapon Piece + Uncut Skill Gem
+  Talk to Matiki (freed by the Siren's death)
+
+Shrike Island
+  (op) Impaled Karui
+    Club?
+  (op) Cave
+    Experience shrine
+  (op) Corpse Nest
+    3rd Torn Map Piece
+  Corrupted Nests
+    Quest: Shrike Island
+    Boss: Scourge of the Skies
+    Reward: Weapon Piece + Uncut Skill Gem
+    Reward: Ruby, Sapphire, Topaz or Amethyst Ring
+
+Abandoned Prison
+  (op) Riot Armaments
+    Weapons
+  The Chapel
+    Reward: life / mana flask recovery
+  (op) Forgotten Cells
+    Gemcutter's Prism maybe?
+  Go to Solitary Confinement
+
+Solitary Confinement
+  (op) Warden's Chamber
+    Chests
+  Open the Fortified Door, kill The Prisoner (use a Ballista)
+    Quest: Abandoned Prison
+    Reward: Weapon Piece + Uncut Skill Gem
+    Reward: Amber, Jade or Lapis Amulet
+
+Isle of Kin
+  (op) Voltaxic Spire
+    Buff
+  (op) Wrecked Boat
+    4th Torn Map Piece
+  (op) Abandoned Delving Site
+    Lesser Jeweller's Orb
+  (op) Beast Pen
+    Rare
+  Primal Arena
+    Quest: The Blind Beast
+    Boss: The Blind Beast
+    Reward: 2 skill points, Sulphite Potion + Uncut Skill Gem
+  Go to Volcanic Warrens
+
+Volcanic Warrens
+  (op) Cave
+    Winter Orb shrine
+  (op) Volcanic Nest
+    2 big rares
+  The Tyrant's Throne
+    Quest: Land of the Kin
+    Boss: Krutog, Lord of Kin
+
+Eye of Hinekora
+  Talk to Matiki, peer into the Well of Passing
+  Tests of Mettle: Kaom, Maata, Rakiata
+    Reward: 5% mana
+  Find the Halls of the Dead
+
+Halls of the Dead
+  (op) Tawhoa's Test - turn in the Blank Tattoo to Navali
+    Quest: Tawhoa's Test
+    Reward: Dexterity or Lightning Tattoo of Tawhoa
+  (op) Tasalio's Test - turn in the Blank Tattoo to Navali
+    Quest: Tasalio's Test
+    Reward: Intelligence or Cold Tattoo of Tasalio
+  (op) Ngamahu's Test - turn in the Blank Tattoo to Navali
+    Quest: Ngamahu's Test
+    Reward: Strength or Fire Tattoo of Ngamahu
+  Yama's Test
+    Boss: Yama the White - pick up the Silver Coin
+  Enter the portal to meet the Mother
+
+Trial of the Ancestors
+  Mother of Death
+    Reward: 2 skill points
+  Talk to Navali
+    Quest: Trial of the Ancestors
+    Reward: Tattoo of Hinekora
+
+Arastas
+  (op) Evening Bell
+    3 Exalted Orbs
+  (op) Morning Bell
+    3 Regal Orbs
+  Follow the Preacher, survive the ambush, destroy the forcefield
+  Excavated Pit
+    Quest: Utopia
+    Boss: Torvian, Hand of the Saviour
+  Go to The Excavation
+
+The Excavation
+  (op) Excavated Cache
+    Loot
+  The Precursor Forge
+    Boss: Benedictus, First Herald of Utopia
+  Back to Kingsmarch: the Hooded One reforges the Weapon
+
+Ngakanu
+  Talk to Rhodri, find the Heart of the Tribe
+
+Heart of the Tribe
+  Find Tavakai
+    Quest: The Search
+    Boss: Tavakai
+  Back to Kingsmarch, talk to the Hooded One
+
+Plunder's Point
+  (op) Place the Explosives (needs all 4 Torn Map Pieces)
+    Quest: Forgotten Bounty
+    Monsters and treasure
++
+
++ Interludes
+Kingsmarch
+  Talk to the Hooded One: the Interludes (Ogham, the Bazaar, Mount Kriar)
+
+# ---- Recruit the Ezomytes
+
+The Refuge
+  Talk to Renly
+
+Scorched Farmlands
+  Kill Isolde of the White Shroud and Heldra of the Black Pyre
+  Approach the Darkness
+  Go to Stones of Serle
+
+Stones of Serle
+  Activate the Runed Megaliths
+  Kill Siora, Blade of the Mists
+  Talk to Una
+  Back to the Darkness in Scorched Farmlands
+
+The Blackwood
+  Find Holten
+
+Holten
+  Kill Godwin of the Shattered Creed and Sigbert of the Sullied Oath
+  (op) Find Wolvenhold
+  Go to Holten Estate
+
+Wolvenhold
+  (op) Oswin, the Dread Warden
+    Boss
+
+Holten Estate
+  Kill Thane Wulfric and Lady Elswyth
+    Quest: Recruit the Ezomytes
+  Back to Renly
+
+# ---- Recruit the Maraketh
+
+The Khari Bazaar
+  Talk to Asala, then Zarka
+
+The Khari Crossing
+  (op) Kill Akthi, the Final Sting and Anundr, the Sandworm
+    Quest: Clearing the Way
+    Reward from Risu: Book of Specialisation
+  Ascend the tower of Ab Binayi, follow the Wayfinders
+  Go to Pools of Khatal
+
+Pools of Khatal
+  Go to Sel Khari Sanctuary
+
+Sel Khari Sanctuary
+  Kill Elzarah, the Cobra Lord
+  Back to The Khari Crossing, find The Galai Gates
+
+The Galai Gates
+  Kill Vornas, the Fell Flame
+  Go to Qimah
+
+Qimah
+  Find the Ceremony Site, summon Jado
+  Go to Qimah Reservoir
+
+Qimah Reservoir
+  Kill Azmadi, the Faridun Prince
+  Use the Grand Barya
+    Quest: Recruit the Maraketh
+
+# ---- Recruit the Vaal
+
+The Glade
+  Talk to Doryani
+
+Ashen Forest
+  Go to Kriar Village
+
+Kriar Village
+  Kill Lythara, the Wayward Spear
+  Go to Glacial Tarn
+
+Glacial Tarn
+  Kill Rakkar, the Frozen Talon
+  (op) Find Howling Caves
+  Go to Kriar Peaks
+
+Howling Caves
+  (op) Kill The Abominable Yeti, pick up the Ice Tusks
+    Quest: Howling Winds
+    Reward from Hilda: Book of Specialisation
+
+Kriar Peaks
+  Go to Etched Ravine
+
+Etched Ravine
+  Kill Stormgore, the Guardian
+  Go to The Cuachic Vault
+
+The Cuachic Vault
+  Kill Zolin, Blood Priest and Zelina, Blood Priestess
+    Quest: Recruit the Vaal
+  Summon Doryani
+
+# ---- Siege of Oriath
+
+Kingsmarch
+  Talk to the Hooded One
+    Quest: Siege of Oriath
+    Reward: Book of Specialisation
+  Travel to Oriath
++

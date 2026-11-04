@@ -1,59 +1,122 @@
-// Layouts tab: screenshots of zone layouts, kept in %APPDATA%\Poe2MapStat\layouts\<group>\<zone>\<date>.png.
+// Layouts tab: screenshots of zone layouts, kept in %APPDATA%\Poe2MapStat\layouts\<group>\<zone>\: outlines as
+// "<seed>.png", graphs as "graph.png" / "graph_1.png" ..., other screenshots as "<date>.png"; newest first.
 // Left: acts, interludes and maps (one expanded at a time) with their zones. Right: thumbnails of the selected
 // zone; a click opens the picture in the Windows viewer, a right click shows more.
 // The hotkey saves the whole game window, or (Options) starts the Windows snipping tool (ms-screenclip:) and saves
-// the snip it puts on the clipboard; either goes to the zone the player is in. Snips of the map overlay become outline pictures, joined per instance (seed) where they
-// overlap (src/core/outline); the screenshots themselves are kept in <zone>\pieces\<seed>.
+// the snip it puts on the clipboard; either goes to the zone the player is in. Snips of the map overlay become the
+// instance's (seed's) outline picture, joined where they overlap (src/core/outline); the screenshots themselves
+// are kept in <zone>\pieces\<seed>.
 #include "app.h"
 
 #include <objidl.h>
 #include <gdiplus.h>
 
+#include <algorithm>
+#include <functional>
 #include <mutex>
+#include <set>
 
+#include "area_tables.h"
 #include "outline.h"
 #include "outline_graph.h"
 
-HWND hLayHint = nullptr, hLayFolder = nullptr, hGallery = nullptr, hLayCropChk = nullptr, hLayGraph = nullptr;
+HWND hLayFolder = nullptr, hGallery = nullptr, hLayCropChk = nullptr, hLayGraph = nullptr,
+     hLayImport = nullptr;
 bool gLayoutCrop = false;
 
 namespace {
 
 struct Group {
-    const wchar_t* name;
-    std::vector<const wchar_t*> zones;  // in campaign order; zones seen in the log or on disk are added
+    std::wstring name;
+    std::vector<std::wstring> zones;  // zones.txt in its (campaign) order; zones seen in the log or on disk are added
+    std::string key;  // act key from acts.txt ("G1"), "" for folders found on disk and Maps
 };
 
-const Group kGroups[] = {
-    {L"Act 1",
-     {L"The Riverbank", L"Clearfell Encampment", L"Clearfell", L"Mud Burrow", L"The Grelwood", L"The Red Vale",
-      L"The Grim Tangle", L"Cemetery of the Eternals", L"Mausoleum of the Praetor", L"Tomb of the Consort",
-      L"Hunting Grounds", L"Freythorn", L"Ogham Farmlands", L"Ogham Village", L"The Manor Ramparts", L"Ogham Manor"}},
-    {L"Act 2",
-     {L"Vastiri Outskirts", L"The Ardura Caravan", L"Mawdun Quarry", L"Mawdun Mine", L"Traitor's Passage",
-      L"The Halani Gates", L"Trial of the Sekhemas", L"Keth", L"The Lost City", L"Buried Shrines", L"Mastodon Badlands",
-      L"The Bone Pits", L"Valley of the Titans", L"The Titan Grotto", L"Deshar", L"Path of Mourning",
-      L"The Spires of Deshar", L"The Dreadnought", L"Dreadnought Vanguard"}},
-    {L"Act 3",
-     {L"Sandswept Marsh", L"Ziggurat Encampment", L"Jungle Ruins", L"The Venom Crypts", L"Chimeral Wetlands",
-      L"Jiquani's Machinarium", L"Jiquani's Sanctum", L"The Azak Bog", L"Infested Barrens", L"The Matlan Waterways",
-      L"The Drowned City", L"The Molten Vault", L"Apex of Filth", L"Temple of Kopec", L"Utzaal", L"Aggorat",
-      L"The Black Chambers"}},
-    {L"Act 4",
-     {L"Kingsmarch", L"Isle of Kin", L"Volcanic Warrens", L"Kedge Bay", L"Journey's End", L"Whakapanu Island",
-      L"Singing Caverns", L"Abandoned Prison", L"Solitary Confinement", L"Shrike Island", L"Eye of Hinekora",
-      L"Halls of the Dead", L"Arastas", L"The Excavation", L"Ngakanu", L"Heart of the Tribe"}},
-    {L"Interlude 1",
-     {L"Scorched Farmlands", L"Stones of Serle", L"The Blackwood", L"Holten", L"Wolvenhold", L"Holten Estate"}},
-    {L"Interlude 2",
-     {L"Khari Crossing", L"Pools of Khatal", L"Sel Khari Sanctuary", L"The Galai Gates", L"Qimah", L"Qimah Reservoir"}},
-    {L"Interlude 3",
-     {L"Ashen Forest", L"Kriar Village", L"Glacial Tarn", L"Howling Caves", L"Kriar Peaks", L"Etched Ravine",
-      L"The Cuachic Vault"}},
-    {L"Maps", {}},  // filled from the log and from disk
-};
-const int kGroupCount = (int)(sizeof kGroups / sizeof kGroups[0]);
-const int kMaps = kGroupCount - 1;
+
+
+std::vector<Group> kGroups;  // acts by number, then interludes, then "Maps" (filled from the log and from disk)
+int kGroupCount = 0, kMaps = 0;
+
+// "Act 5" -> (0, 5), "Interlude 2" -> (1, 2), anything else -> (-1, 0)
+std::pair<int, int> groupKey(const std::wstring& n) {
+    for (auto [kind, prefix] : {std::pair{0, L"Act "}, {1, L"Interlude "}}) {
+        size_t len = wcslen(prefix);
+        if (n.size() > len && n.compare(0, len, prefix) == 0 && iswdigit(n[len])) return {kind, _wtoi(n.c_str() + len)};
+    }
+    return {-1, 0};
+}
+
+std::wstring layoutsDir();
+std::vector<std::wstring> listDir(const std::wstring& dir, bool folders);
+std::wstring nameKey(const std::wstring& s);
+int gOpen = 0;  // expanded group, -1 = none
+int gSelGroup = -1;  // shown on the right
+
+std::wstring gGroupsSig;  // what the groups were built from
+
+// Group of an act key: Cruel acts share the group of the act ("C_G1" -> "G1").
+std::string baseActKey(const std::string& key) { return key.compare(0, 2, "C_") == 0 ? key.substr(2) : key; }
+// Group / folder name of an act key: its name from acts.txt, the key while unknown ("G5").
+std::wstring actGroupName(const std::string& key) {
+    std::string n = actTable().name(baseActKey(key));
+    return W(n.empty() ? baseActKey(key) : n);
+}
+
+// The groups: the acts and interludes of acts.txt in its order, other act folders found on disk, and Maps.
+void groups(const std::wstring& extra = L"") {
+    std::vector<std::pair<std::wstring, std::string>> names;  // group name, act key
+    auto add = [&](const std::wstring& n, const std::string& key) {
+        for (auto& e : names)
+            if (e.first == n) return;
+        names.push_back({n, key});
+    };
+    for (auto& [key, name] : actTable().entries())
+        if (key.compare(0, 2, "C_") != 0) add(actGroupName(key), key);
+    std::vector<std::wstring> more;  // "Act 7" / "G7" style folders no table lists
+    auto isActFolder = [](const std::wstring& d) {
+        return groupKey(d).first >= 0 || !actKeyOf(U8(d) + "_").empty();
+    };
+    for (auto& d : listDir(layoutsDir(), true))
+        if (isActFolder(d) && lowerW(d) != L"maps") more.push_back(d);
+    if (!extra.empty() && isActFolder(extra)) more.push_back(extra);
+    std::sort(more.begin(), more.end(), [](auto& a, auto& b) { return groupKey(a) < groupKey(b); });
+    for (auto& d : more) add(d, "");
+    std::wstring sig;
+    for (auto& e : names) sig += e.first + L"|";
+    for (auto& e : zoneTable().entries()) sig += W(e.second) + L"|";
+    if (sig == gGroupsSig && kGroupCount) return;  // nothing new
+    gGroupsSig = sig;
+    std::wstring open = gOpen >= 0 && gOpen < kGroupCount ? kGroups[gOpen].name : L"";
+    std::wstring sel = gSelGroup >= 0 && gSelGroup < kGroupCount ? kGroups[gSelGroup].name : L"";
+    kGroups.clear();
+    for (auto& [n, key] : names) {
+        Group gr{n, {}, key};
+        auto have = [&](const std::wstring& z) {
+            for (auto& x : gr.zones)
+                if (nameKey(x) == nameKey(z)) return true;
+            return false;
+        };
+        if (!key.empty())  // zones.txt in its order
+            for (auto& [id, zn] : zoneTable().entries())
+                if (baseActKey(actKeyOf(id)) == key) {
+                    std::wstring z = W(g.nameOf(id));
+                    if (!have(z)) gr.zones.push_back(z);
+                }
+        // an act no zone has yet (G5 = unknown, the "Interlude" world map) only shows once its folder exists
+        bool folder = GetFileAttributesW((layoutsDir() + L"\\" + n).c_str()) != INVALID_FILE_ATTRIBUTES;
+        if (!key.empty() && gr.zones.empty() && !folder && W(key) != extra) continue;
+        kGroups.push_back(gr);
+    }
+    kGroups.push_back({L"Maps", {}, ""});
+    kGroupCount = (int)kGroups.size(), kMaps = kGroupCount - 1;
+    auto index = [&](const std::wstring& n, int def) {  // the same group as before, where it is now
+        for (int i = 0; i < kGroupCount; ++i)
+            if (kGroups[i].name == n) return i;
+        return def;
+    };
+    gOpen = index(open, open.empty() && kGroupCount ? gOpen : -1);
+    gSelGroup = index(sel, -1);
+}
 
 const int kLeftW = 250;  // zone menu
 const int kHeadH = 70;  // title above the thumbnails
@@ -72,10 +135,8 @@ struct Hit {
     int idx;
 };
 
-int gOpen = 0;  // expanded group, -1 = none
 std::vector<std::wstring> gZones;  // zones of the expanded group
 std::vector<int> gCounts;  // screenshots per zone
-int gSelGroup = -1;  // shown on the right
 std::wstring gSelZone;
 std::vector<Shot> gShots;
 std::wstring gSelPath;  // the selected picture (click), "" = none
@@ -121,7 +182,9 @@ void makeDirs(int gi, const std::wstring& zone) {
 }
 
 // Any picture with "graph" in its name is a graph (shown by the GraphOverlay, not used as an outline).
+}  // namespace
 bool isGraph(const std::wstring& n) { return lowerW(n).find(L"graph") != std::wstring::npos; }
+namespace {
 
 bool isPicture(const std::wstring& n) {
     std::wstring l = lowerW(n);
@@ -138,6 +201,7 @@ std::wstring sidecarOf(const std::wstring& pic) {
     std::wstring dir = pic.substr(0, slash);
     std::wstring stem = pic.substr(slash + 1, dot == std::wstring::npos || dot < slash ? std::wstring::npos : dot - slash - 1);
     std::wstring seed = L"other";
+    if (!stem.empty() && std::all_of(stem.begin(), stem.end(), iswdigit)) seed = stem;
     size_t at = stem.find(L" seed ");
     if (at != std::wstring::npos) {
         size_t e = at + 6;
@@ -191,22 +255,76 @@ std::vector<std::wstring> listDir(const std::wstring& dir, bool folders) {
     return r;
 }
 
+// Outline pictures are "<seed>.png" (older versions: "<date> seed <seed>.png"); 0 = not an outline.
+uint32_t outlineSeed(const std::wstring& name) {
+    if (isGraph(name)) return 0;
+    std::wstring stem = name.substr(0, name.find_last_of(L'.'));
+    if (!stem.empty() && stem.size() <= 10 && std::all_of(stem.begin(), stem.end(), iswdigit))
+        return (uint32_t)wcstoul(stem.c_str(), nullptr, 10);
+    size_t at = stem.find(L" seed ");
+    return at == std::wstring::npos ? 0 : (uint32_t)wcstoul(stem.c_str() + at + 6, nullptr, 10);
+}
+std::wstring outlinePath(const std::wstring& dir, uint32_t seed) { return dir + L"\\" + std::to_wstring(seed) + L".png"; }
+
+uint64_t fileTime(const std::wstring& path) {  // last written
+    WIN32_FILE_ATTRIBUTE_DATA a;
+    if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &a)) return 0;
+    return ((uint64_t)a.ftLastWriteTime.dwHighDateTime << 32) | a.ftLastWriteTime.dwLowDateTime;
+}
+void sortNewest(std::vector<std::wstring>& paths) {  // by date written, newest first
+    std::vector<std::pair<uint64_t, std::wstring>> t;
+    for (auto& p : paths) t.push_back({fileTime(p), p});
+    std::stable_sort(t.begin(), t.end(), [](auto& a, auto& b) { return a.first > b.first; });
+    for (size_t i = 0; i < t.size(); ++i) paths[i] = t[i].second;
+}
+
+// A new graph: "graph.png", then "graph_1.png", "graph_2.png" ...
+std::wstring graphPath(const std::wstring& dir) {
+    std::wstring p = dir + L"\\graph.png";
+    for (int i = 1; fileExists(p); ++i) p = dir + L"\\graph_" + std::to_wstring(i) + L".png";
+    return p;
+}
+
+// Names of older versions in a zone folder: "<date> seed <seed>.png" outlines become "<seed>.png" (their points
+// move along), "graph <date>.png" become graph.png, graph_1.png ... oldest first. Dates stay as file dates.
+void renameOld(const std::wstring& dir) {
+    static std::set<std::wstring> done;
+    if (!done.insert(lowerW(dir)).second) return;
+    std::vector<std::wstring> graphs;
+    for (auto& f : listDir(dir, false)) {
+        const std::wstring path = dir + L"\\" + f, low = lowerW(f);
+        if (isGraph(f)) {
+            if (low.rfind(L"graph ", 0) == 0) graphs.push_back(path);
+            continue;
+        }
+        if (f.find(L" seed ") == std::wstring::npos || sidecarFound(path).empty()) continue;  // plain screenshot
+        uint32_t seed = outlineSeed(f);
+        std::wstring to = outlinePath(dir, seed);
+        if (!seed || fileExists(to)) continue;
+        std::wstring side = sidecarFound(path);
+        if (!MoveFileW(path.c_str(), to.c_str())) continue;
+        makeParent(sidecarOf(to));
+        MoveFileExW(side.c_str(), sidecarOf(to).c_str(), MOVEFILE_REPLACE_EXISTING);
+    }
+    std::sort(graphs.begin(), graphs.end(), [](auto& a, auto& b) { return fileTime(a) < fileTime(b); });
+    for (auto& gp : graphs) MoveFileW(gp.c_str(), graphPath(dir).c_str());
+}
+
 // Group of an area id: the act or interlude, Maps for other areas (sub-areas too), -1 for hideouts.
 int groupOf(const std::string& id) {
+    groups();  // a new act (added to acts.txt by the tracker) gets its group
     if (id.empty() || Tracker::isHideout(id)) return -1;
     if (!Tracker::isCampaign(id)) return kMaps;
-    std::string a = Tracker::actOf(id);
-    size_t c = a.find(" (Cruel)");
-    if (c != std::string::npos) a.resize(c);
+    std::string key = baseActKey(actKeyOf(id));
     for (int i = 0; i < kMaps; ++i)
-        if (W(a) == kGroups[i].name) return i;
+        if (kGroups[i].key == key) return i;
     return -1;
 }
 
 // The name a zone is stored under: the built-in spelling, else an existing folder with the same name.
 std::wstring resolveZone(int gi, const std::wstring& name) {
     std::wstring k = nameKey(name);
-    for (const wchar_t* z : kGroups[gi].zones)
+    for (auto& z : kGroups[gi].zones)
         if (nameKey(z) == k) return z;
     for (auto& d : listDir(layoutsDir() + L"\\" + kGroups[gi].name, true))
         if (nameKey(d) == k) return d;
@@ -214,6 +332,7 @@ std::wstring resolveZone(int gi, const std::wstring& name) {
 }
 
 void buildZones() {
+    groups();
     gZones.clear();
     gCounts.clear();
     if (gOpen < 0) return;
@@ -226,11 +345,11 @@ void buildZones() {
             if (nameKey(z) == k) return true;
         return false;
     };
-    for (const wchar_t* z : kGroups[gOpen].zones) gZones.push_back(z);
+    for (auto& z : kGroups[gOpen].zones) gZones.push_back(z);
     for (auto& kv : g.areaNames) {  // zones seen in the log
         if (groupOf(kv.first) != gOpen) continue;
         if (gOpen == kMaps && kv.first.rfind("Map", 0) != 0) continue;  // only real maps
-        std::wstring n = W(kv.second);
+        std::wstring n = W(g.nameOf(kv.first));
         if (!n.empty() && !have(n)) extra.push_back(n);
     }
     for (auto& d : listDir(layoutsDir() + L"\\" + kGroups[gOpen].name, true))
@@ -247,17 +366,20 @@ void freeShots(std::vector<Shot>& v) {
     v.clear();
 }
 
-// Screenshots of the selected zone, newest first (file names are dates). Thumbnails already made are kept.
+// Screenshots of the selected zone, newest first (by file date). Thumbnails already made are kept.
 void loadShots() {
     std::vector<Shot> old;
     old.swap(gShots);
     if (gSelGroup >= 0 && !gSelZone.empty()) {
         std::wstring dir = zoneDir(gSelGroup, gSelZone);
-        auto files = listDir(dir, false);
-        std::sort(files.begin(), files.end(), [](auto& a, auto& b) { return lowerW(a) > lowerW(b); });
-        for (auto& f : files) {
+        renameOld(dir);
+        std::vector<std::wstring> files;
+        for (auto& f : listDir(dir, false)) files.push_back(dir + L"\\" + f);
+        sortNewest(files);
+        for (auto& path : files) {
             Shot s;
-            s.path = dir + L"\\" + f;
+            s.path = path;
+            std::wstring f = path.substr(path.find_last_of(L'\\') + 1);
             s.label = f.substr(0, f.find_last_of(L'.'));
             for (auto& o : old)
                 if (o.thumb && o.path == s.path) {
@@ -389,17 +511,15 @@ std::wstring freePath(const std::wstring& base) {
 }
 
 // Saves a screenshot to the zone and says what became of it ("" = failed). A snip of the map overlay in a known
-// instance becomes an outline picture "<date> seed <seed>.png", joined with the outlines of that instance it
-// overlaps; the screenshot itself goes to "pieces\<seed>". Other pictures are saved as they are.
+// instance becomes the outline picture "<seed>.png", joined with the outline of that instance if they
+// overlap; the screenshot itself goes to "pieces\<seed>". Other pictures are saved as "<date>.png".
 std::mutex gOutlineBusy;  // one at a time: two quick presses (or a graph) work on the same files
 
-// Outlines of an instance in a zone's folder ("<date> seed <seed>.png" and its points), loaded.
+// Outlines of an instance in a zone's folder ("<seed>.png" and its points), loaded.
 void loadOutlines(const std::wstring& dir, uint32_t seed, std::vector<std::wstring>& paths,
                   std::vector<outline::Outline>& outs) {
-    std::wstring tag = L" seed " + std::to_wstring(seed);
     for (auto& f : listDir(dir, false)) {
-        if (isGraph(f) || (f.find(tag + L".") == std::wstring::npos && f.find(tag + L" (") == std::wstring::npos))
-            continue;
+        if (outlineSeed(f) != seed) continue;
         outline::Outline o;
         if (!withPicture(dir + L"\\" + f, [&](Gdiplus::Bitmap& b) { return toImage(b, o.img); })) continue;
         o.labels = outline::loadLabels(readText(sidecarFound(dir + L"\\" + f)));
@@ -439,7 +559,7 @@ int keepMostDetailed(const std::vector<outline::Outline>& outs) {
 }
 
 std::wstring storeShot(const outline::Image& shot, int gi, const std::wstring& zone, uint32_t seed,
-                       std::wstring* outlinePath = nullptr) {
+                       std::wstring* outPath = nullptr) {
     std::lock_guard<std::mutex> lock(gOutlineBusy);
     gdipInit();
     makeDirs(gi, zone);
@@ -447,10 +567,11 @@ std::wstring storeShot(const outline::Image& shot, int gi, const std::wstring& z
     GetLocalTime(&t);
     wchar_t d[64];
     swprintf(d, 64, L"%04d-%02d-%02d %02d-%02d-%02d", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
-    std::wstring dir = zoneDir(gi, zone), tag = seed ? L" seed " + std::to_wstring(seed) : L"";
+    std::wstring dir = zoneDir(gi, zone);
+    renameOld(dir);
     outline::Mask e = outline::edges(shot);
     if (!seed || std::count(e.m.begin(), e.m.end(), 1) < 300)  // no map outline in it, or instance unknown
-        return savePng(shot, freePath(dir + L"\\" + d + tag)) ? L"saved" : L"";
+        return savePng(shot, freePath(dir + L"\\" + d)) ? L"saved" : L"";
 
     std::wstring pieces = dir + L"\\pieces\\" + std::to_wstring(seed);
     CreateDirectoryW((dir + L"\\pieces").c_str(), nullptr);
@@ -462,11 +583,11 @@ std::wstring storeShot(const outline::Image& shot, int gi, const std::wstring& z
     outline::Added a = outline::add(outs, shot);
     int keep = keepMostDetailed(outs);
     if (keep < 0) return L"";
-    std::wstring path = keep < (int)paths.size() ? paths[keep] : freePath(dir + L"\\" + d + tag);
-    if (!saveOutline(outs[keep], path)) return L"";
-    if (outlinePath) *outlinePath = path;
+    const std::wstring path = outlinePath(dir, seed);
     for (size_t i = 0; i < paths.size(); ++i)  // joined into the kept one, or showing less of the map
-        if ((int)i != keep) deleteOutline(paths[i]);
+        if (paths[i] != path) deleteOutline(paths[i]);
+    if (!saveOutline(outs[keep], path)) return L"";
+    if (outPath) *outPath = path;
     if (keep != a.into) return L"kept the larger outline (this piece does not overlap it yet)";
     if (!a.overlapped) return L"new outline";
     if (a.overlapped == 1) return L"added to the outline";
@@ -550,7 +671,7 @@ void captureGame(int gi, const std::wstring& zone, uint32_t seed) {
     int w = c.right - c.left, h = c.bottom - c.top;
     // overlays a screen capture would show (older Windows): hidden while the picture is taken
     std::vector<HWND> shown;
-    for (HWND ov : {hOverlay, hCmdBar, hGraphOv, hLayoutOv})
+    for (HWND ov : {hOverlay, hCmdBar, hGraphOv, hStepsOv})
         if (capturedOnScreen(ov) && IsWindowVisible(ov)) shown.push_back(ov), ShowWindow(ov, SW_HIDE);
     if (!shown.empty()) DwmFlush(), Sleep(30);
     HDC sdc = GetDC(nullptr), mdc = CreateCompatibleDC(sdc);
@@ -838,7 +959,28 @@ void clampScroll() {
 }
 
 // Pictures dragged onto the tab are copied into a zone: the one dropped on in the list, else the selected one.
-// File names are kept (an outline "<date> seed <n>.png" stays one), " (2)" is added when the name is taken.
+// File names are kept (an outline "<seed>.png" stays one), " (2)" is added when the name is taken.
+// Copies a picture (and its points, if it has them) into a zone. A file of the same name and size is there already:
+// skipped, so importing the same folder twice adds nothing.
+enum class Copied { Yes, Same, Failed };
+Copied copyPicture(const std::wstring& f, int gi, const std::wstring& zone) {
+    makeDirs(gi, zone);
+    std::wstring dir = zoneDir(gi, zone), name = f.substr(f.find_last_of(L"\\/") + 1);
+    size_t dot = name.find_last_of(L'.');
+    std::wstring base = dir + L"\\" + name.substr(0, dot), ext = name.substr(dot), to = base + ext;
+    auto size = [](const std::wstring& p) {
+        WIN32_FILE_ATTRIBUTE_DATA a;
+        return GetFileAttributesExW(p.c_str(), GetFileExInfoStandard, &a) ? ((uint64_t)a.nFileSizeHigh << 32 | a.nFileSizeLow)
+                                                                          : (uint64_t)-1;
+    };
+    if (fileExists(to) && size(to) == size(f)) return Copied::Same;
+    for (int i = 2; fileExists(to); ++i) to = base + L" (" + std::to_wstring(i) + L")" + ext;
+    if (!CopyFileW(f.c_str(), to.c_str(), TRUE)) return Copied::Failed;
+    std::wstring side = sidecarFound(f);
+    if (!side.empty()) makeParent(sidecarOf(to)), CopyFileW(side.c_str(), sidecarOf(to).c_str(), TRUE);
+    return Copied::Yes;
+}
+
 void dropFiles(HDROP drop) {
     POINT pt;
     DragQueryPoint(drop, &pt);
@@ -859,25 +1001,10 @@ void dropFiles(HDROP drop) {
                     MB_ICONINFORMATION);
         return;
     }
-    makeDirs(gi, zone);
-    std::wstring dir = zoneDir(gi, zone);
     int copied = 0, skipped = 0;
     for (auto& f : files) {
-        std::wstring name = f.substr(f.find_last_of(L"\\/") + 1);
-        if (!isPicture(name)) {
-            ++skipped;
-            continue;
-        }
-        size_t dot = name.find_last_of(L'.');
-        std::wstring base = dir + L"\\" + name.substr(0, dot), ext = name.substr(dot);
-        std::wstring to = base + ext;
-        for (int i = 2; fileExists(to); ++i) to = base + L" (" + std::to_wstring(i) + L")" + ext;
-        if (CopyFileW(f.c_str(), to.c_str(), TRUE)) {
-            ++copied;
-            std::wstring side = sidecarFound(f);
-            if (!side.empty()) makeParent(sidecarOf(to)), CopyFileW(side.c_str(), sidecarOf(to).c_str(), TRUE);
-        } 
-        else ++skipped;
+        if (!isPicture(f) || copyPicture(f, gi, zone) == Copied::Failed) ++skipped;
+        else ++copied;
     }
     gOpen = gi;
     buildZones();
@@ -1018,9 +1145,9 @@ void createLayoutsPage() {
     hGallery = CreateWindowExW(WS_EX_ACCEPTFILES, wc.lpszClassName, L"", WS_CHILD | WS_CLIPSIBLINGS, 0, 0, 10, 10,
                                hMain, nullptr, wc.hInstance, nullptr);
     gPages[PG_LAYOUTS].push_back(hGallery);
-    hLayHint = label(L"", ID_LAY_HINT, fNormal, PG_LAYOUTS, false, SS_ENDELLIPSIS);
     hLayFolder = btn(L"Open folder", ID_LAY_FOLDER, PG_LAYOUTS, Btn::Normal);
     hLayGraph = btn(L"Make graph", ID_LAY_GRAPH, PG_LAYOUTS, Btn::Accent);
+    hLayImport = btn(L"Import...", ID_LAY_IMPORT, PG_LAYOUTS, Btn::Normal);
     gLayoutCrop = GetPrivateProfileIntW(L"layouts", L"SelectArea", 0, iniPath().c_str()) != 0;
 }
 
@@ -1033,11 +1160,6 @@ void toggleLayoutCrop() {
 
 void refreshLayouts() {
     if (!hGallery) return;
-    std::wstring key = hotkeyName(HK_LAYOUT);
-    setTextIfChanged(hLayHint, gHotkeysOn && key != L"Not set"
-                                   ? std::wstring()
-                                   : std::wstring(L"Set a key for Layout screenshot in Options to "
-                                                  L"take screenshots in game."));
     buildZones();
     loadShots();
     clampScroll();
@@ -1085,16 +1207,17 @@ void layoutsWatch() {
 }
 
 // Points graph of the selected zone from its outline pictures (src/core/outline_graph), saved as
-// "graph <date>.png" in the zone's folder. Runs on a worker thread.
+// "graph.png" (then graph_1.png, graph_2.png ...) in the zone's folder. Runs on a worker thread.
 void makeLayoutGraph() {
     if (gSelGroup < 0 || gSelZone.empty()) {
         MessageBoxW(hMain, L"Pick a zone on the left first.", L"Make graph", MB_ICONINFORMATION);
         return;
     }
     std::wstring dir = zoneDir(gSelGroup, gSelZone);
-    std::vector<std::wstring> files;  // outline pictures: "<date> seed <seed>.png"
+    renameOld(dir);
+    std::vector<std::wstring> files;  // outline pictures: "<seed>.png"
     for (auto& f : listDir(dir, false))
-        if (f.find(L" seed ") != std::wstring::npos && !isGraph(f)) files.push_back(dir + L"\\" + f);
+        if (outlineSeed(f)) files.push_back(dir + L"\\" + f);
     if (files.size() < 2) {
         MessageBoxW(hMain,
                     (L"A graph needs outlines of at least 2 runs of this zone; there " +
@@ -1114,7 +1237,7 @@ void makeLayoutGraph() {
             std::lock_guard<std::mutex> lock(gOutlineBusy);
             std::vector<uint32_t> seeds;
             for (auto& f : files) {
-                uint32_t s = (uint32_t)wcstoul(f.c_str() + f.find(L" seed ") + 6, nullptr, 10);
+                uint32_t s = outlineSeed(f.substr(f.find_last_of(L'\\') + 1));
                 if (s && std::find(seeds.begin(), seeds.end(), s) == seeds.end()) seeds.push_back(s);
             }
             for (uint32_t s : seeds) {
@@ -1135,12 +1258,8 @@ void makeLayoutGraph() {
                     }
                     if (!re.empty()) {
                         for (auto& p : paths) deleteOutline(p);
-                        std::wstring tag = L" seed " + std::to_wstring(s);
-                        std::wstring date = shots[0].substr(0, shots[0].find_last_of(L'.'));
-                        size_t paren = date.find(L" (");
-                        if (paren != std::wstring::npos) date.resize(paren);
                         int keep = keepMostDetailed(re);  // one per instance
-                        if (keep >= 0) saveOutline(re[keep], freePath(dir + L"\\" + date + tag));
+                        if (keep >= 0) saveOutline(re[keep], outlinePath(dir, s));
                         o.clear();
                         if (keep >= 0) o.push_back(std::move(re[keep]));
                         paths.clear();
@@ -1158,11 +1277,6 @@ void makeLayoutGraph() {
         outline::Graph gr = outline::pointsGraph(outs);
         auto* r = new ShotDone{L"", zone, gi, true, gr.used, (int)outs.size(), {}, 0};
         if (!gr.img.empty()) {
-            SYSTEMTIME t;
-            GetLocalTime(&t);
-            wchar_t d[64];
-            swprintf(d, 64, L"graph %04d-%02d-%02d %02d-%02d-%02d", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute,
-                     t.wSecond);
             // caption and legend (how many runs had each point, and whether it stays in one place)
             std::vector<std::pair<std::wstring, POINT>> texts;
             texts.push_back({std::to_wstring(gr.used) + L" of " + std::to_wstring(outs.size()) +
@@ -1170,22 +1284,197 @@ void makeLayoutGraph() {
                                  L"numbered rings: spots the inner places swap between",
                              POINT{16, 12}});
             for (auto& t : gr.texts) texts.push_back({W(t.text), POINT{t.x, t.y}});
-            if (savePng(gr.img, freePath(dir + L"\\" + d), &texts)) r->what = L"graph";
+            if (savePng(gr.img, graphPath(dir), &texts)) r->what = L"graph";
         }
         if (!PostMessageW(hMain, WM_LAYOUT_DONE, 0, (LPARAM)r)) delete r;
     }).detach();
 }
 
-// Graph pictures of the zone the player is in, newest first (for the GraphOverlay).
-std::vector<std::wstring> currentZoneGraphs() {
+// Moves a folder to a new name; when that exists already, its files go into it (same names get " (2)").
+static void moveMerge(const std::wstring& from, const std::wstring& to) {
+    if (lowerW(from) == lowerW(to) || GetFileAttributesW(from.c_str()) == INVALID_FILE_ATTRIBUTES) return;
+    if (MoveFileW(from.c_str(), to.c_str())) return;
+    WIN32_FIND_DATAW fd;
+    HANDLE f = FindFirstFileW((from + L"\\*").c_str(), &fd);
+    if (f == INVALID_HANDLE_VALUE) return;
+    do {
+        std::wstring n = fd.cFileName;
+        if (n == L"." || n == L"..") continue;
+        std::wstring a = from + L"\\" + n, b = to + L"\\" + n;
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            CreateDirectoryW(b.c_str(), nullptr);
+            moveMerge(a, b);
+        } else {
+            size_t dot = n.find_last_of(L'.');
+            std::wstring stem = dot == std::wstring::npos ? n : n.substr(0, dot), ext = dot == std::wstring::npos ? L"" : n.substr(dot);
+            for (int i = 2; GetFileAttributesW(b.c_str()) != INVALID_FILE_ATTRIBUTES; ++i)
+                b = to + L"\\" + stem + L" (" + std::to_wstring(i) + L")" + ext;
+            MoveFileW(a.c_str(), b.c_str());
+        }
+    } while (FindNextFileW(f, &fd));
+    FindClose(f);
+    RemoveDirectoryW(from.c_str());
+}
+
+// Layout folders named before the tables knew a name: an act folder "G5" becomes "Act 5", a zone folder named by
+// its id (or by the log's name, when zones.txt names it differently) gets the table's name. Nothing is deleted.
+void layoutsFollowTables() {
+    const std::wstring root = layoutsDir();
+    if (GetFileAttributesW(root.c_str()) == INVALID_FILE_ATTRIBUTES) return;
+    for (auto& [key, name] : actTable().entries()) {
+        std::string base = baseActKey(key), n = actTable().name(base);
+        if (!n.empty()) moveMerge(root + L"\\" + W(base), root + L"\\" + W(n));
+    }
+    for (auto& [id, name] : zoneTable().entries()) {
+        if (!knownName(name)) continue;
+        std::wstring group = root + L"\\" + actGroupName(actKeyOf(id)), to = group + L"\\" + safeName(W(name));
+        std::vector<std::wstring> old = {W(id)};
+        auto it = g.areaNames.find(id);
+        if (it != g.areaNames.end() && it->second != name) old.push_back(safeName(W(it->second)));
+        for (auto& d : listDir(group, true))
+            for (auto& o : old)
+                if (nameKey(d) == nameKey(o) && nameKey(d) != nameKey(W(name))) moveMerge(group + L"\\" + d, to);
+    }
+    gGroupsSig.clear();  // groups again with the new names
+    if (hGallery) refreshLayouts();
+}
+
+// Zone of a folder name: a zone id (G1_2), a zone of an act, or a map under a "Maps" folder. false = none.
+static bool zoneOfFolder(const std::wstring& name, const std::wstring& parent, int& gi, std::wstring& zone) {
+    std::string id = U8(name);
+    if (zoneTable().has(id) || Tracker::isCampaign(id)) {
+        gi = groupOf(id), zone = W(g.nameOf(id));
+        return gi >= 0;
+    }
+    const std::wstring k = nameKey(name);
+    for (int i = 0; i < kMaps; ++i)
+        for (auto& z : kGroups[i].zones)
+            if (nameKey(z) == k) {
+                gi = i, zone = z;
+                return true;
+            }
+    for (auto& [aid, aname] : g.areaNames)
+        if (nameKey(W(g.nameOf(aid))) == k && groupOf(aid) >= 0) {
+            gi = groupOf(aid), zone = resolveZone(gi, W(g.nameOf(aid)));
+            return true;
+        }
+    if (lowerW(parent) == L"maps") {
+        gi = kMaps, zone = name;
+        return true;
+    }
+    return false;
+}
+
+// Layouts tab, Import: pictures into the selected zone, or a whole folder where each picture goes to the zone its
+// folders name (a downloaded Layouts folder: <Act>\<Zone>\*.png, also by zone id, maps under Maps\<map>).
+void importLayouts() {
+    groups();
+    enum { CMD_FILES = 1, CMD_FOLDER };
+    HMENU m = CreatePopupMenu();
+    std::wstring into = gSelZone.empty() ? L"Pictures into the selected zone..." : L"Pictures into " + gSelZone + L"...";
+    AppendMenuW(m, MF_STRING | (gSelGroup < 0 || gSelZone.empty() ? MF_GRAYED : 0), CMD_FILES, into.c_str());
+    AppendMenuW(m, MF_STRING, CMD_FOLDER, L"A folder: each picture to its zone...");
+    RECT r;
+    GetWindowRect(hLayImport, &r);
+    int cmd = TrackPopupMenu(m, TPM_RETURNCMD | TPM_RIGHTBUTTON, r.left, r.bottom, 0, hMain, nullptr);
+    DestroyMenu(m);
+    int copied = 0, same = 0, failed = 0;
+    std::set<std::wstring> zones, unmatched;
+    int lastGi = -1;
+    std::wstring lastZone;
+    if (cmd == CMD_FILES) {
+        for (auto& f : pickFiles(hMain, (L"Pictures for " + gSelZone).c_str(), L"Pictures", L"*.png;*.jpg;*.jpeg;*.bmp")) {
+            if (!isPicture(f)) continue;
+            Copied c = copyPicture(f, gSelGroup, gSelZone);
+            (c == Copied::Yes ? copied : c == Copied::Same ? same : failed)++;
+        }
+        zones.insert(gSelZone), lastGi = gSelGroup, lastZone = gSelZone;
+    } else if (cmd == CMD_FOLDER) {
+        std::wstring root = pickFolder(hMain, L"Folder with layouts (Act / Zone / pictures)");
+        if (root.empty()) return;
+        std::function<void(const std::wstring&, std::vector<std::wstring>)> walk = [&](const std::wstring& dir,
+                                                                                     std::vector<std::wstring> path) {
+            WIN32_FIND_DATAW fd;
+            HANDLE f = FindFirstFileW((dir + L"\\*").c_str(), &fd);
+            if (f == INVALID_HANDLE_VALUE) return;
+            do {
+                std::wstring n = fd.cFileName;
+                if (n == L"." || n == L"..") continue;
+                if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+                    std::wstring l = lowerW(n);
+                    if (l == L"pieces" || l == L"metadata") continue;  // screenshots and points come with their pictures
+                    auto p = path;
+                    p.push_back(n);
+                    walk(dir + L"\\" + n, p);
+                } else if (isPicture(n)) {
+                    int gi = -1;
+                    std::wstring zone;
+                    bool found = false;
+                    for (int i = (int)path.size() - 1; i >= 0 && !found; --i)  // nearest folder that names a zone
+                        found = zoneOfFolder(path[i], i > 0 ? path[i - 1] : L"", gi, zone);
+                    if (!found) {
+                        unmatched.insert(path.empty() ? n : path.back());
+                        continue;
+                    }
+                    Copied c = copyPicture(dir + L"\\" + n, gi, zone);
+                    (c == Copied::Yes ? copied : c == Copied::Same ? same : failed)++;
+                    zones.insert(zone), lastGi = gi, lastZone = zone;
+                }
+            } while (FindNextFileW(f, &fd));
+            FindClose(f);
+        };
+        walk(root, {});
+    } else
+        return;
+    if (lastGi >= 0) {
+        gOpen = lastGi;
+        buildZones();
+        selectZone(lastGi, lastZone);
+    }
+    std::wstring msg = std::to_wstring(copied) + L" picture(s) imported into " + std::to_wstring(zones.size()) +
+                       L" zone(s).";
+    if (same) msg += L"\n" + std::to_wstring(same) + L" were there already.";
+    if (failed) msg += L"\n" + std::to_wstring(failed) + L" could not be copied.";
+    if (!unmatched.empty()) {
+        msg += L"\nNo zone found for the folders: ";
+        int k = 0;
+        for (auto& u : unmatched) msg += (k++ ? L", " : L"") + u;
+    }
+    MessageBoxW(hMain, msg.c_str(), L"Import layouts", MB_ICONINFORMATION);
+}
+
+// Zone names for the Steps tab: the campaign zones in order, then other areas seen in the log.
+std::vector<std::wstring> knownZoneNames() {
     std::vector<std::wstring> r;
-    int gi = groupOf(g.location);
-    if (gi < 0) return r;
-    std::wstring dir = zoneDir(gi, resolveZone(gi, W(g.locationName.empty() ? g.nameOf(g.location) : g.locationName)));
-    for (auto& f : listDir(dir, false))
-        if (isGraph(f)) r.push_back(dir + L"\\" + f);
-    std::sort(r.begin(), r.end(), [](auto& a, auto& b) { return lowerW(a) > lowerW(b); });
+    std::set<std::wstring> have;
+    auto add = [&](const std::wstring& n) {
+        if (!n.empty() && have.insert(lowerW(n)).second) r.push_back(n);
+    };
+    groups();
+    for (int i = 0; i < kMaps; ++i)  // the acts' zones in campaign order (zones.txt, then the built-in list)
+        for (auto& z : kGroups[i].zones) add(z);
+    std::vector<std::wstring> more;
+    for (auto& [id, name] : g.areaNames)
+        if (!Tracker::isHideout(id)) more.push_back(W(g.nameOf(id)));
+    std::sort(more.begin(), more.end(), [](auto& a, auto& b) { return lowerW(a) < lowerW(b); });
+    for (auto& n : more) add(n);
     return r;
+}
+
+// Graph pictures of the zone the player is in, newest first (for the GraphOverlay).
+std::vector<std::wstring> currentZonePictures(bool graphsOnly) {
+    std::vector<std::wstring> graphs, outlines;
+    int gi = groupOf(g.location);
+    if (gi < 0) return graphs;
+    std::wstring dir = zoneDir(gi, resolveZone(gi, W(g.locationDisplay())));
+    renameOld(dir);
+    for (auto& f : listDir(dir, false))
+        if (isGraph(f)) graphs.push_back(dir + L"\\" + f);
+        else if (!graphsOnly && outlineSeed(f)) outlines.push_back(dir + L"\\" + f);
+    sortNewest(graphs);
+    sortNewest(outlines);
+    graphs.insert(graphs.end(), outlines.begin(), outlines.end());
+    return graphs;
 }
 
 HBITMAP layoutPicture(const std::wstring& path, int maxW, int maxH, int& w, int& h) {
@@ -1209,7 +1498,7 @@ void takeLayoutShot() {
         trayBalloon(L"Layout screenshot", L"Enter a campaign zone or a map first (not in a hideout).");
         return;
     }
-    std::wstring name = W(g.locationName.empty() ? g.nameOf(g.location) : g.locationName);
+    std::wstring name = W(g.locationDisplay());
     stopPending();
     gPendGroup = gi;
     gPendZone = resolveZone(gi, name);
@@ -1218,6 +1507,7 @@ void takeLayoutShot() {
     gPendingAt = GetTickCount64();
     gClipSeq = GetClipboardSequenceNumber();
     gPending = AddClipboardFormatListener(hMain) != FALSE;
+    if (gPending && hideCapturedOverlays(3000)) Sleep(30);  // the snipping tool must not see them
     if (!gPending ||
         (INT_PTR)ShellExecuteW(nullptr, L"open", L"ms-screenclip:", nullptr, nullptr, SW_SHOWNORMAL) <= 32) {
         stopPending();  // no snipping tool: take the whole game window
@@ -1230,7 +1520,7 @@ void layoutDone(LPARAM lp) {
     std::unique_ptr<ShotDone> r((ShotDone*)lp);
     if (!r->graph) {
         shotSaved(r->what, r->gi, r->zone);
-        if (!r->outline.empty() && r->seed == currentSeed()) layoutOverlayShow(r->outline, r->seed);
+        if (!r->outline.empty() && r->seed == currentSeed()) graphOverlayShowPicture(r->outline);
         return;
     }
     SetWindowTextW(hLayGraph, L"Make graph");

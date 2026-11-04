@@ -7,7 +7,9 @@
 #include "string_util.h"
 
 template <class T>
-static std::string S(T v) { return std::to_string(v); }
+static std::string S(T v) {
+    return std::to_string(v);
+}
 
 static std::string joinTab(std::initializer_list<std::string> f) {
     std::string r;
@@ -22,8 +24,10 @@ static std::vector<std::string> splitTab(const std::string& line) {
     std::vector<std::string> out;
     std::string cur;
     for (char c : line) {
-        if (c == '\t') { out.push_back(cur); cur.clear(); }
-        else if (c != '\r') cur += c;
+        if (c == '\t') {
+            out.push_back(cur);
+            cur.clear();
+        } else if (c != '\r') cur += c;
     }
     out.push_back(cur);
     return out;
@@ -33,10 +37,28 @@ static std::vector<std::string> splitTab(const std::string& line) {
 static std::string runLine(const char* tag, const Run& r) {
     std::string subs;
     for (auto& x : r.subs)
-        subs += (subs.empty() ? "" : ";") + x.areaId + ":" + S(x.seed) + ":" + S(x.level) + ":" + S(x.ms) + ":" + S(x.entries);
-    return joinTab({tag, S(r.id), r.date, r.areaId, r.name, S(r.level), S(r.seed), r.genTime, r.enterTime, r.endTime,
-                    S(r.activeMs), S(r.loadSec), S(r.entries), S((int)r.reason), r.hideoutId, r.hideoutName,
-                    S(r.hideoutReturns), S(r.hideoutMs), subs, S(r.countedTick)});
+        subs += (subs.empty() ? "" : ";") + x.areaId + ":" + S(x.seed) + ":" + S(x.level) + ":" + S(x.ms) + ":" +
+                S(x.entries);
+    return joinTab({tag,
+                    S(r.id),
+                    r.date,
+                    r.areaId,
+                    r.name,
+                    S(r.level),
+                    S(r.seed),
+                    r.genTime,
+                    r.enterTime,
+                    r.endTime,
+                    S(r.activeMs),
+                    S(r.loadSec),
+                    S(r.entries),
+                    S((int)r.reason),
+                    r.hideoutId,
+                    r.hideoutName,
+                    S(r.hideoutReturns),
+                    S(r.hideoutMs),
+                    subs,
+                    S(r.countedTick)});
 }
 
 static uint64_t u64(const std::string& s) { return (uint64_t)strtoull(s.c_str(), nullptr, 10); }
@@ -83,10 +105,12 @@ static Run parseRun(const std::vector<std::string>& f) {
 std::string Tracker::serialize(int parts) const {
     std::string o = "POE2MAPSTAT\t2\n";
     if (parts & kCampaign) o += joinTab({"CAMPAIGN", campaignStartTime, S((int)cmpClock)});
-    if (parts & kMaps) o += joinTab({"STATE", S(generalStart), S(summaryStart), S(summarySkipId), campaignStartTime, S(nextId)});
+    if (parts & kMaps)
+        o += joinTab({"STATE", S(generalStart), S(summaryStart), S(summarySkipId), campaignStartTime, S(nextId)});
     std::vector<Run> runs;
     if (parts & kMaps) runs = history;
-    if (hasCurrent && (parts & kMaps)) {  // snapshot of the open map (crash safety); on a normal exit suspend() already finished it
+    if (hasCurrent &&
+        (parts & kMaps)) {  // snapshot of the open map (crash safety); on a normal exit suspend() already finished it
         Run c = cur;
         c.activeMs = cur.activeAt(lastTick);
         if (cur.inSegment) c.countedTick = lastTick;
@@ -101,8 +125,8 @@ std::string Tracker::serialize(int parts) const {
     if (parts & kCampaign)
         for (auto& z : zones)
             o += joinTab({"ZONE", S(z.id), z.areaId, z.name, S(z.level), S(z.seed), S(z.town ? 1 : 0), z.firstEnter,
-                      z.lastEnter, S(z.activeAt(lastTick)), S(z.entries), S(z.loadSec), S(z.inSegment ? lastTick : z.leftTick),
-                      S(z.closed ? 1 : 0)});
+                          z.lastEnter, S(z.activeAt(lastTick)), S(z.entries), S(z.loadSec),
+                          S(z.inSegment ? lastTick : z.leftTick), S(z.closed ? 1 : 0), z.lastLeft});
     return o;
 }
 
@@ -168,6 +192,7 @@ void Tracker::deserialize(const std::string& data, int parts) {
             z.loadSec = atof(f[11].c_str());
             z.leftTick = (uint32_t)u64(f[12]);
             z.closed = f[13] == "1";
+            if (f.size() > 14) z.lastLeft = f[14];
             zones.push_back(z);
         }
     }

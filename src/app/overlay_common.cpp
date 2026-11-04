@@ -1,8 +1,13 @@
-// Shared by the overlays: show only with the game, snapping while dragging, right-click menu.
+// Shared by the overlays: shown only with the game and kept right above its window, snapping while dragging,
+// right-click menu, click-through.
 #include "app.h"
+
+#include <dwmapi.h>
 
 // Windows feeds the snapped rect back into the next WM_MOVING, so snapping that rect would stick forever.
 // Work from where the drag started + how far the mouse moved, then snap.
+static ULONGLONG gHiddenUntil = 0;  // overlays a capture would show are hidden until then (snipping tool)
+
 static POINT gDragPt;
 static RECT gDragRc;
 
@@ -33,7 +38,7 @@ void snapOverlay(HWND self, RECT* r) {
             ny = y;
         }
     };
-    for (HWND o : {hOverlay, hCmdBar, hGraphOv, hLayoutOv}) {
+    for (HWND o : {hOverlay, hCmdBar, hGraphOv, hStepsOv}) {
         if (!o || o == self || !IsWindowVisible(o)) continue;
         RECT q;
         GetWindowRect(o, &q);
@@ -118,52 +123,73 @@ static void anchorApply(HWND ov, const wchar_t* sec, const RECT& g) {
     if (x != w.left || y != w.top) SetWindowPos(ov, nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
-// Overlays belong to the game: shown only while its window is open and not minimized, placed relative to it.
+static bool isOverlay(HWND w) {
+    for (HWND o : {hOverlay, hCmdBar, hGraphOv, hStepsOv})
+        if (o && w == o) return true;
+    return false;
+}
+
+// The overlays sit right above the game window in the window order (not always on top): whatever is in front of
+// the game (a browser, this app's window, the snipping tool) covers them too. When the game comes to the front it is
+// put above them, so they are moved back above it.
+static void keepAboveGame(HWND game) {
+    // the first window above the game that isn't an overlay: the overlays go right under it
+    HWND above = GetWindow(game, GW_HWNDPREV);
+    while (above && isOverlay(above)) above = GetWindow(above, GW_HWNDPREV);
+    bool belowTopmost = above && (GetWindowLongPtrW(above, GWL_EXSTYLE) & WS_EX_TOPMOST);
+    for (HWND w : {hOverlay, hCmdBar, hGraphOv, hStepsOv}) {
+        if (!w || !IsWindowVisible(w)) continue;
+        // already above the game?
+        bool ok = false;
+        for (HWND x = GetWindow(game, GW_HWNDPREV); x; x = GetWindow(x, GW_HWNDPREV)) {
+            if (x == w) {
+                ok = true;
+                break;
+            }
+            if (!isOverlay(x)) break;  // something else between the game and the overlay
+        }
+        if (ok) continue;
+        SetWindowPos(w, !above || belowTopmost ? HWND_TOP : above, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    }
+}
+
+// Overlays belong to the game: shown while its window is open and not minimized, placed relative to it.
 void updateOverlayVisibility() {
     static RECT lastGame = {};
     HWND game = findGame();
-    gGameVisible = game && !IsIconic(game);
+    gGameVisible = game && IsWindowVisible(game) && !IsIconic(game);
     bool wantOv = hOverlay && gOverlayOn && gGameVisible, wantCb = hCmdBar && gCmdOn && gGameVisible;
-    bool wantGr = hGraphOv && gGraphOn && gGameVisible;
-    bool wantLo = hLayoutOv && layoutOverlayShown() && gGameVisible;
+    bool wantGr = hGraphOv && gGraphOn && gGameVisible, wantSt = hStepsOv && gStepsOn && gGameVisible;
     RECT g;
-    if ((wantOv || wantCb || wantGr || wantLo) && gameClientRect(g)) {
+    if ((wantOv || wantCb || wantGr || wantSt) && gameClientRect(g)) {
         // game moved / resized, or an overlay is about to appear: place it first, so it never flashes at the old spot
         bool appearing = (wantOv && !IsWindowVisible(hOverlay)) || (wantCb && !IsWindowVisible(hCmdBar)) ||
-                         (wantGr && !IsWindowVisible(hGraphOv)) || (wantLo && !IsWindowVisible(hLayoutOv));
+                         (wantGr && !IsWindowVisible(hGraphOv)) || (wantSt && !IsWindowVisible(hStepsOv));
         if (appearing || !EqualRect(&g, &lastGame)) {
             if (wantOv) anchorApply(hOverlay, L"MapTimerOverlay", g);
             if (wantCb) anchorApply(hCmdBar, kCbSec, g);
             if (wantGr) anchorApply(hGraphOv, L"GraphOverlay", g);
-            if (wantLo) anchorApply(hLayoutOv, L"LayoutOverlay", g);
+            if (wantSt) anchorApply(hStepsOv, L"StepsOverlay", g);
             lastGame = g;
         }
     }
-    auto set = [](HWND w, bool on) {
+    const bool capHide = GetTickCount64() < gHiddenUntil;
+    auto set = [capHide](HWND w, bool on) {
+        if (capHide && capturedOnScreen(w)) on = false;
         if (w && (IsWindowVisible(w) != 0) != on) ShowWindow(w, on ? SW_SHOWNOACTIVATE : SW_HIDE);
     };
     set(hOverlay, gOverlayOn && gGameVisible);
     set(hCmdBar, gCmdOn && gGameVisible);
     set(hGraphOv, wantGr);
-    set(hLayoutOv, wantLo);
+    set(hStepsOv, wantSt);
 
-    // When the game gets the focus back (e.g. after a picture viewer), borderless fullscreen puts it above the
-    // topmost overlays. They are raised again then, and on the next polls too, as the game can take a moment.
-    static HWND lastFg = nullptr;
-    static int raise = 0;
-    HWND fg = GetForegroundWindow();
-    if (fg != lastFg) lastFg = fg, raise = 3;
-    if (raise > 0 && game && fg == game) {
-        --raise;
-        for (HWND w : {hOverlay, hCmdBar, hGraphOv, hLayoutOv})
-            if (w && IsWindowVisible(w))
-                SetWindowPos(w, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
-    }
+    if (gGameVisible) keepAboveGame(game);
 }
 
 // Right-click menu of an overlay (Dracula owner-drawn like the column menu).
 void overlayMenu(HWND ov) {
-    enum { CMD_OPEN = 30, CMD_CLOSE, CMD_PAUSE, CMD_STOP, CMD_RESET };
+    enum { CMD_OPEN = 30, CMD_CLOSE, CMD_PAUSE, CMD_STOP, CMD_RESET, CMD_FIT };
     // The timer overlay in the campaign also controls the campaign clock: Pause / Resume and Stop, or Reset
     // (a new run from zero) once it is stopped.
     bool campaign = ov == hOverlay && ovCampaignShown();
@@ -175,6 +201,7 @@ void overlayMenu(HWND ov) {
         items.push_back({0, L""});
     }
     items.push_back({CMD_OPEN, L"Open Poe2 | MapStat"});
+    if (ov == hStepsOv && stepsOverlayFixedHeight()) items.push_back({CMD_FIT, L"Fit height to steps"});
     items.push_back({0, L""});
     items.push_back({CMD_CLOSE, L"Close overlay"});
     gMenuItems.clear();
@@ -213,12 +240,15 @@ void overlayMenu(HWND ov) {
         campaignAction(HK_START);
     } else if (cmd == CMD_OPEN) {
         showMain();
+    } else if (cmd == CMD_FIT) {
+        stepsOverlayFitHeight();
     } else if (cmd == CMD_CLOSE) {
         if (ov == hOverlay) {
             showOverlay(false);
             ovIniSet(L"On", 0);
-        } else if (ov == hLayoutOv) {
-            layoutOverlayHide();  // until the next layout screenshot
+        } else if (ov == hStepsOv) {
+            showStepsOverlay(false);
+            WritePrivateProfileStringW(L"StepsOverlay", L"On", L"0", iniPath().c_str());
         } else if (ov == hGraphOv) {
             showGraphOverlay(false);
             WritePrivateProfileStringW(L"GraphOverlay", L"On", L"0", iniPath().c_str());
@@ -237,7 +267,7 @@ HWND hClickChk = nullptr;
 static bool gThruNow = false;  // what the overlays have now
 
 static void applyThru(bool thru) {
-    for (HWND o : {hOverlay, hCmdBar, hGraphOv, hLayoutOv}) {
+    for (HWND o : {hOverlay, hCmdBar, hGraphOv, hStepsOv}) {
         if (!o) continue;
         LONG_PTR ex = GetWindowLongPtrW(o, GWL_EXSTYLE);
         LONG_PTR want = thru ? ex | WS_EX_TRANSPARENT : ex & ~(LONG_PTR)WS_EX_TRANSPARENT;
@@ -260,15 +290,41 @@ void setClickThru(bool on) {
     if (hClickChk) InvalidateRect(hClickChk, nullptr, FALSE);
 }
 
-// Overlays are left out of screenshots (Windows 10 2004 and later): the game's own capture, the snipping tool and
-// other screenshot tools see the game under them. Elsewhere they are hidden for a moment while the app captures.
+// Options "Hide overlays in screenshots" (on by default): overlays are left out of screenshots (Windows 10 2004 and
+// later), so the game's own capture, the snipping tool and other screenshot tools see the game under them. Off (or
+// on older Windows) they show in screenshots; the app's own layout screenshots still hide them for a moment.
+bool gHideInCapture = true;
+HWND hCaptureChk = nullptr;
+
 bool hideFromCapture(HWND h) {
     typedef BOOL(WINAPI * Fn)(HWND, DWORD);
     static Fn f = (Fn)(void*)GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetWindowDisplayAffinity");
-    const DWORD WDA_EXCLUDEFROMCAPTURE_ = 0x11;
-    if (!h || !f || !f(h, WDA_EXCLUDEFROMCAPTURE_)) return false;
-    SetPropW(h, L"Poe2MapStat.NoCapture", (HANDLE)1);
-    return true;
+    const DWORD WDA_NONE_ = 0, WDA_EXCLUDEFROMCAPTURE_ = 0x11;
+    if (!h || !f) return false;
+    bool hidden = gHideInCapture && f(h, WDA_EXCLUDEFROMCAPTURE_);
+    if (!gHideInCapture) f(h, WDA_NONE_);
+    if (hidden) SetPropW(h, L"Poe2MapStat.NoCapture", (HANDLE)1);
+    else RemovePropW(h, L"Poe2MapStat.NoCapture");
+    return hidden;
 }
 
 bool capturedOnScreen(HWND h) { return h && !GetPropW(h, L"Poe2MapStat.NoCapture"); }
+
+void setHideInCapture(bool on) {
+    gHideInCapture = on;
+    ovIniSet(L"HideInScreenshots", on ? 1 : 0);
+    for (HWND o : {hOverlay, hCmdBar, hGraphOv, hStepsOv})
+        if (o) hideFromCapture(o);
+    if (hCaptureChk) InvalidateRect(hCaptureChk, nullptr, FALSE);
+}
+
+// Overlays that screenshots would show are hidden for ms (the snipping tool takes its picture as it opens).
+bool hideCapturedOverlays(int ms) {
+    bool any = false;
+    for (HWND o : {hOverlay, hCmdBar, hGraphOv, hStepsOv}) any |= o && IsWindowVisible(o) && capturedOnScreen(o);
+    if (!any) return false;
+    gHiddenUntil = GetTickCount64() + (ULONGLONG)ms;
+    updateOverlayVisibility();
+    DwmFlush();
+    return true;
+}

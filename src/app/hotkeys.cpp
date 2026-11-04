@@ -1,4 +1,4 @@
-// Hotkeys for the campaign clock (Stop / Pause / Start) and layout screenshots, set in Options.
+// Hotkeys for the campaign clock (Stop / Pause / Start), layout screenshots and steps, set in Options.
 // A low-level keyboard hook sees the keys while the game has focus; the keys still reach the game.
 #include "app.h"
 
@@ -15,6 +15,8 @@ HotKey gKeys[HK_COUNT] = {
     {L"CampaignPause", 0, 0},
     {L"CampaignStart", 0, 0},
     {L"LayoutScreenshot", 0, 0},
+    {L"StepComplete", 0, 0},
+    {L"StepUndo", 0, 0},
 };
 
 HHOOK gHook = nullptr;

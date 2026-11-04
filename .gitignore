@@ -44,3 +44,7 @@ Client.txt
 *.swp
 .DS_Store
 Thumbs.db
+
+# shared downloads (StepsPresets, Layouts) are part of the repo, whatever the patterns above say
+!download/
+!download/**

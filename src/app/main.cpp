@@ -12,8 +12,9 @@ void tick() {
     refreshUi();
     refreshExperience();  // follows level ups and area changes even while another tab is open
     graphOverlayTick();
+    stepsTick();
+    areaTablesTick();
     layoutsWatch();
-    layoutOverlayTick();
     if (hOverlay && gOverlayOn) {
         ovSyncFooter();
         InvalidateRect(hOverlay, nullptr, FALSE);
@@ -32,6 +33,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
         case WM_CREATE:
             hMain = h;
+            loadAreaTables();  // before the log is read: names and acts come from it
             loadData();
             darkTitleBar(h);
             loadHotkeys();
@@ -46,6 +48,12 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_SIZE:
             layout(LOWORD(lp), HIWORD(lp));
             return 0;
+        case WM_MOVE:
+            stepsHideSuggestions();
+            return 0;
+        case WM_ACTIVATE:
+            if (LOWORD(wp) == WA_INACTIVE) stepsHideSuggestions();
+            break;
         case WM_GETMINMAXINFO:
             ((MINMAXINFO*)lp)->ptMinTrackSize = {860, 660};
             return 0;
@@ -62,14 +70,17 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         }
         case WM_DRAWITEM:
             if (((DRAWITEMSTRUCT*)lp)->CtlType == ODT_MENU) drawMenu((DRAWITEMSTRUCT*)lp);
+            else if (((DRAWITEMSTRUCT*)lp)->CtlType == ODT_LISTBOX) stepsDrawItem((DRAWITEMSTRUCT*)lp);
             else drawButton((DRAWITEMSTRUCT*)lp);
             return TRUE;
         case WM_MEASUREITEM:
             if (((MEASUREITEMSTRUCT*)lp)->CtlType == ODT_MENU) measureMenu((MEASUREITEMSTRUCT*)lp);
+            else if (((MEASUREITEMSTRUCT*)lp)->CtlType == ODT_LISTBOX) ((MEASUREITEMSTRUCT*)lp)->itemHeight = 28;
             return TRUE;
         case WM_NOTIFY: {
             NMHDR* nh = (NMHDR*)lp;
-            bool isList = nh->hwndFrom == hHist || nh->hwndFrom == hSumList || nh->hwndFrom == hCmpList;
+            bool isList = nh->hwndFrom == hHist || nh->hwndFrom == hSumList || nh->hwndFrom == hCmpList ||
+                          nh->hwndFrom == hCmpActList;
             if (nh->code == NM_CUSTOMDRAW && isList) return listCustomDraw((NMLVCUSTOMDRAW*)lp);
             if (nh->code == NM_RCLICK && isList) {  // right click on a row: menu for the column under the cursor
                 LVHITTESTINFO ht = {};
@@ -114,6 +125,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         }
         case WM_HOTKEY_ACT:
             if ((int)wp == HK_LAYOUT) takeLayoutShot();
+            else if ((int)wp == HK_STEP_DONE || (int)wp == HK_STEP_UNDO) stepsAction((int)wp);
             else campaignAction((int)wp);
             return 0;
         case WM_CLIPBOARDUPDATE:
@@ -125,12 +137,23 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_MOUSEWHEEL:  // the wheel reaches the window with focus: pass it to the gallery under the cursor
             if (gPage == PG_LAYOUTS && hGallery) return SendMessageW(hGallery, msg, wp, lp);
             break;
+        case WM_HSCROLL:
+            if ((HWND)lp == hAlphaSlider) setOverlayTransparency(sliderValue(hAlphaSlider));
+            return 0;
         case WM_KEY_CAPTURED:
             keyCaptured((UINT)wp, (int)lp);
             return 0;
         case WM_COMMAND:
             if (HIWORD(wp) == EN_CHANGE && LOWORD(wp) >= ID_EXP_NAME && LOWORD(wp) <= ID_EXP_GAIN) {
                 expEditChanged((HWND)lp);
+                return 0;
+            }
+            if (LOWORD(wp) >= ID_STEPS_EDIT && LOWORD(wp) <= ID_STEPS_RESET) {  // edit .. reset, in app.h order
+                stepsCommand(LOWORD(wp), HIWORD(wp));
+                return 0;
+            }
+            if (LOWORD(wp) >= ID_KEY_BTN0 && LOWORD(wp) < ID_KEY_BTN0 + (int)HK_COUNT) {
+                beginKeyCapture(LOWORD(wp) - ID_KEY_BTN0);
                 return 0;
             }
             switch (LOWORD(wp)) {
@@ -143,6 +166,13 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 case ID_TAB_SUM:
                     showPage(PG_SUMMARY);
                     break;
+                case ID_LVL_EXPORT:  // the level ups of the pill shown (Campaign or Maps)
+                    exportListView(hExpList, exportName(gLvlMaps ? L"levelups-maps" : L"levelups-campaign").c_str());
+                    break;
+                case ID_LVL_CMP:
+                case ID_LVL_MAPS:
+                    setLevelMode(LOWORD(wp) == ID_LVL_MAPS);
+                    break;
                 case ID_TAB_CMP:
                     showPage(PG_CAMPAIGN);
                     break;
@@ -152,17 +182,48 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 case ID_TAB_LAY:
                     showPage(PG_LAYOUTS);
                     break;
+                case ID_TAB_STEPS:
+                    showPage(PG_STEPS);
+                    break;
+                case ID_STEPS_OV:
+                    showStepsOverlay(!gStepsOn);
+                    WritePrivateProfileStringW(L"StepsOverlay", L"On", gStepsOn ? L"1" : L"0", iniPath().c_str());
+                    break;
+                case ID_ZONES_IMPORT:
+                    importAreaTables();
+                    break;
+                case ID_OPT_PILL0:
+                case ID_OPT_PILL1:
+                case ID_OPT_PILL2:
+                    setOptPill(LOWORD(wp) - ID_OPT_PILL0);
+                    break;
+                case ID_STEPS_NOTES:
+                    setStepsNotes(!gStepsNotes);
+                    break;
+                case ID_STEPS_MINUS:
+                case ID_STEPS_PLUS:
+                    setStepsShown(gStepsShown + (LOWORD(wp) == ID_STEPS_PLUS ? 1 : -1));
+                    break;
                 case ID_LAY_FOLDER:
                     openLayoutFolder();
                     break;
                 case ID_LAY_CROP:
                     toggleLayoutCrop();
                     break;
+                case ID_LAY_IMPORT:
+                    importLayouts();
+                    break;
                 case ID_LAY_GRAPH:
                     makeLayoutGraph();
                     break;
                 case ID_CLICKTHRU:
                     setClickThru(!gClickThru);
+                    break;
+                case ID_CAPTURE_CHK:
+                    setHideInCapture(!gHideInCapture);
+                    break;
+                case ID_GRAPH_ONLY:
+                    setGraphOnly(!gGraphOnly);
                     break;
                 case ID_GRAPH_OV:
                     showGraphOverlay(!gGraphOn);
@@ -215,16 +276,21 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     exportListView(hSumList, exportName(L"summary").c_str());
                     break;
                 case ID_EXP_CMP:
-                    exportListView(hCmpList, exportName(L"campaign").c_str());
+                {  // only the pill shown: Campaign (whole run), one act, or Summary; the file is named after it
+                    std::wstring what = L"campaign";
+                    if (gSelAct != "Campaign") {
+                        what += L"-";
+                        for (wchar_t c : lowerW(W(gSelAct)))
+                            if (iswalnum(c)) what += c;
+                            else if (c == L' ' && what.back() != L'-') what += L'-';
+                    }
+                    exportListView(IsWindowVisible(hCmpActList) ? hCmpActList : hCmpList, exportName(what.c_str()).c_str());
                     break;
+                }
                 case ID_REC_MINUS:
                 case ID_REC_PLUS:
                     setOverlayRecords(gOvRecords + (LOWORD(wp) == ID_REC_PLUS ? 1 : -1));
                     SetWindowTextW(hRecVal, std::to_wstring(gOvRecords).c_str());
-                    break;
-                case ID_ALPHA_MINUS:
-                case ID_ALPHA_PLUS:
-                    setOverlayTransparency(gOvTransparency + (LOWORD(wp) == ID_ALPHA_PLUS ? 10 : -10));
                     break;
                 case ID_CLOSE_CHK:
                     gStartInTray = !gStartInTray;
@@ -259,12 +325,6 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 case ID_CMP_PAUSE:
                     campaignAction(HK_PAUSE);
                     break;
-                case ID_KEY_BTN0:
-                case ID_KEY_BTN1:
-                case ID_KEY_BTN2:
-                case ID_KEY_BTN3:
-                    beginKeyCapture(LOWORD(wp) - ID_KEY_BTN0);
-                    break;
                 case ID_ONTOP:
                     setOnTop(!gOnTopOn);
                     WritePrivateProfileStringW(L"main", L"OnTop", gOnTopOn ? L"1" : L"0", iniPath().c_str());
@@ -295,7 +355,18 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     break;
             }
             return 0;
-        case WM_CONTEXTMENU:  // right-click on a hotkey button: Remove
+        case WM_CONTEXTMENU:  // right-click on a hotkey button: Remove; on the campaign timer: Generate Summary
+            if (gPage == PG_CAMPAIGN) {
+                POINT pt;
+                GetCursorPos(&pt);
+                RECT r1, r2;
+                GetWindowRect(hCmpTimer, &r1);
+                GetWindowRect(hCmpTimerLoad, &r2);
+                if (PtInRect(&r1, pt) || PtInRect(&r2, pt)) {
+                    campaignTimerMenu(pt);
+                    return 0;
+                }
+            }
             for (int i = 0; i < HK_COUNT; ++i)
                 if ((HWND)wp == hKeyBtn[i]) {
                     hotkeyMenu(i, lp);
@@ -317,6 +388,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             showMain();
             return 0;
         case WM_DESTROY:
+            stepsSaveOnExit();
             removeKeyHook();
             trayIcon(NIM_DELETE);
             if (hOverlay) saveOverlayPos();
@@ -359,6 +431,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
         CopyFileW((gExeDir + L"\\areas.txt").c_str(), (gDataDir + L"\\areas.txt").c_str(), TRUE);
     }
 
+    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);  // file / folder dialogs
     bool firstRun = GetFileAttributesW(iniPath().c_str()) == INVALID_FILE_ATTRIBUTES;
     initSessionFiles();
     resolveLogPath();
@@ -398,6 +471,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
     SetWindowTextW(hRecVal, std::to_wstring(gOvRecords).c_str());
     setOverlayTransparency(ovIniInt(L"Transparency", 10));
     setClickThru(ovIniInt(L"ClickThrough", 1) != 0);
+    gHideInCapture = ovIniInt(L"HideInScreenshots", 1) != 0;  // before the overlays are made
     gStartInTray = GetPrivateProfileIntW(L"main", L"StartInTray", 1, iniPath().c_str()) != 0;
     gGameVisible = false;
     // react at once when the game is minimized / restored (the 0.5 s poll covers start / close)
@@ -412,7 +486,10 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
         WINEVENT_OUTOFCONTEXT);
     if (ovIniInt(L"On", 1)) showOverlay(true);
     if (GetPrivateProfileIntW(kCbSec, L"On", 0, iniPath().c_str())) showCmdBar(true);
+    gGraphOnly = GetPrivateProfileIntW(L"GraphOverlay", L"OnlyGraphs", 0, iniPath().c_str()) != 0;
     if (GetPrivateProfileIntW(L"GraphOverlay", L"On", 0, iniPath().c_str())) showGraphOverlay(true);
+    setStepsShown((int)GetPrivateProfileIntW(L"StepsOverlay", L"Shown", 5, iniPath().c_str()));
+    if (GetPrivateProfileIntW(L"StepsOverlay", L"On", 0, iniPath().c_str())) showStepsOverlay(true);
     if (firstRun || !gStartInTray || updated) ShowWindow(h, show);
 #ifdef UPDATE_REPO
     gAutoUpdate = GetPrivateProfileIntW(L"main", L"AutoUpdate", 1, iniPath().c_str()) != 0;

@@ -1,15 +1,20 @@
 // Tracker: feeds log lines, classifies areas and switches between maps, sub-areas, hideouts and campaign zones.
 #include <cstdlib>
 
+#include "area_tables.h"
 #include "tracker.h"
 #include "string_util.h"
 
 const char* stateName(RunState s) {
     switch (s) {
-        case RunState::Loading: return "Loading";
-        case RunState::Active: return "In map";
-        case RunState::Paused: return "Paused";
-        case RunState::Finished: return "Finished";
+        case RunState::Loading:
+            return "Loading";
+        case RunState::Active:
+            return "In map";
+        case RunState::Paused:
+            return "Paused";
+        case RunState::Finished:
+            return "Finished";
     }
     return "?";
 }
@@ -17,7 +22,8 @@ const char* stateName(RunState s) {
 std::string fmtDuration(uint64_t ms) {
     uint64_t s = ms / 1000;
     char b[32];
-    if (s >= 3600) snprintf(b, sizeof b, "%u:%02u:%02u", (unsigned)(s / 3600), (unsigned)(s / 60 % 60), (unsigned)(s % 60));
+    if (s >= 3600)
+        snprintf(b, sizeof b, "%u:%02u:%02u", (unsigned)(s / 3600), (unsigned)(s / 60 % 60), (unsigned)(s % 60));
     else snprintf(b, sizeof b, "%02u:%02u", (unsigned)(s / 60), (unsigned)(s % 60));
     return b;
 }
@@ -90,6 +96,7 @@ void Tracker::suspend(uint32_t now) {
 }
 
 void Tracker::onGenerate(const std::string& area, int level, uint32_t seed, const LogLine& l) {
+    ++areasEntered;
     returnGap = 0;
     if (offline) {  // first area after a logout or a game restart
         offline = false;
@@ -105,7 +112,10 @@ void Tracker::onGenerate(const std::string& area, int level, uint32_t seed, cons
     curSub = -1;  // the segment that just closed was the last one in that sub-area
     sceneNamePending = true;
     inHideoutNow = false;
-    if (isHideout(area) && area != homeId) { homeId = area; homeName.clear(); }
+    if (isHideout(area) && area != homeId) {
+        homeId = area;
+        homeName.clear();
+    }
     location = area;
     locationLevel = level;
     locationSeed = seed;
@@ -113,6 +123,9 @@ void Tracker::onGenerate(const std::string& area, int level, uint32_t seed, cons
 
     // Campaign zone: own timer per area+seed, pauses any map run.
     if (isCampaign(area)) {
+        // ids no table has yet go into the tables as "unknown" (the user / a newer app fills them in)
+        bool newZone = zoneTable().add(area), newAct = actTable().add(actKeyOf(area));
+        if (newZone || newAct) tablesChanged = true;
         noteAreaLevel(area, level);
         inSafe = true;
         if (hasCurrent) cur.state = RunState::Paused;
@@ -177,7 +190,10 @@ void Tracker::onGenerate(const std::string& area, int level, uint32_t seed, cons
     // Area + seed identify one instance, so any earlier row of it is continued (never two rows per instance).
     int match = -1;
     for (size_t i = history.size(); i-- > std::max(generalStart, summaryStart);)
-        if (history[i].areaId == area && history[i].seed == seed) { match = (int)i; break; }
+        if (history[i].areaId == area && history[i].seed == seed) {
+            match = (int)i;
+            break;
+        }
     if (match >= 0) {
         if (hasCurrent) finish(EndReason::NewSeed, &l);  // the open map ends and is appended after the match
         {
@@ -239,7 +255,7 @@ void Tracker::onLoaded(const std::string& name, double sec, const LogLine& l) {
     offStayTick = 0;
     if (pending == Pending::Safe && location == homeId) {
         homeName = name;
-        if (hasCurrent && cur.hideoutId == homeId) {   // back at the starting point
+        if (hasCurrent && cur.hideoutId == homeId) {  // back at the starting point
             if (cur.hideoutName.empty()) cur.hideoutName = name;
             cur.inHideout = true;
             cur.hideoutStartTick = l.tick;
@@ -297,8 +313,7 @@ void Tracker::feed(const std::string& raw) {
     if (startsWith(m, "[LOADING SCREEN] (")) {
         sawLoadingScreen = true;
         size_t close = m.find(") Duration = ");
-        if (close != std::string::npos)
-            onLoaded(m.substr(18, close - 18), atof(m.c_str() + close + 13), l);
+        if (close != std::string::npos) onLoaded(m.substr(18, close - 18), atof(m.c_str() + close + 13), l);
         return;
     }
     if (startsWith(m, "[SCENE] Set Source [")) {
@@ -306,7 +321,10 @@ void Tracker::feed(const std::string& raw) {
         if (sceneNamePending && !location.empty() && !name.empty() && name[0] != '(') {
             sceneNamePending = false;
             auto it = areaNames.find(location);
-            if (it == areaNames.end() || it->second != name) { areaNames[location] = name; areaNamesChanged = true; }
+            if (it == areaNames.end() || it->second != name) {
+                areaNames[location] = name;
+                areaNamesChanged = true;
+            }
             if (curZone >= 0 && zones[curZone].areaId == location) zones[curZone].name = name;
             if (hasCurrent && cur.areaId == location && cur.entries == 0) cur.name = name;
         }
@@ -319,7 +337,7 @@ void Tracker::feed(const std::string& raw) {
         size_t c = m.rfind(" (", p);
         if (p != std::string::npos && c != std::string::npos && c > 2) {
             int lvl = atoi(m.c_str() + p + 14);
-            if (lvl >= 1 && lvl <= 100) onLevelUp(m.substr(2, c - 2), lvl);
+            if (lvl >= 1 && lvl <= 100) onLevelUp(m.substr(2, c - 2), lvl, l);
         }
         return;
     }
