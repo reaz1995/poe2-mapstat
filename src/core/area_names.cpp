@@ -5,10 +5,14 @@
 #include <fstream>
 #include <set>
 
+#include "area_tables.h"
 #include "tracker.h"
 #include "string_util.h"
 
+// zones.txt (area_tables) first, then the name the log gave, then the id
 std::string Tracker::nameOf(const std::string& id) const {
+    std::string t = zoneTable().name(id);
+    if (!t.empty()) return t;
     auto it = areaNames.find(id);
     return it == areaNames.end() ? id : it->second;
 }
@@ -81,7 +85,7 @@ static const struct {
     {"Wolvenhold", 56, 64},
     {"Holten Estate", 56, 64},
     // Interlude 2
-    {"Khari Crossing", 54, 62},
+    {"The Khari Crossing", 54, 62},
     {"Pools of Khatal", 55, 63},
     {"Sel Khari Sanctuary", 55, 63},
     {"The Galai Gates", 56, 64},

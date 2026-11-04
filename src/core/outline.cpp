@@ -355,7 +355,7 @@ Outline render(const Image& shot) {
 }
 
 std::string saveLabels(const std::vector<Label>& labels) {
-    std::string s = "# Poe2 | MapStat outline labels v4: x y w h iconX iconY exit text(w*h hex, brightness/16)\n";
+    std::string s = "# Poe2 | MapStat outline labels v5: x y w h iconX iconY exit text(w*h hex, brightness/16)\n";
     char b[96];
     for (const Label& l : labels) {
         snprintf(b, sizeof b, "%d %d %d %d %d %d %d ", l.x, l.y, l.w, l.h, l.cx, l.cy, l.exit ? 1 : 0);
@@ -478,6 +478,53 @@ void hideWorldLabels(Image& img) {
     }
 }
 
+// Bits of lit ground that made it into an outline (outside the map, or loose inside it) are taken out: the map's
+// walls are joined into big pieces, and pillars inside the map are closed loops. Small open bits go; labels stay.
+void clean(Outline& o) {
+    Image& im = o.img;
+    int w = im.w, h = im.h;
+    std::vector<uint8_t> m((size_t)w * h, 0);
+    for (size_t i = 0; i < m.size(); ++i) {
+        const uint8_t* p = &im.px[i * 3];
+        int mx = std::max({p[0], p[1], p[2]}), mn = std::min({p[0], p[1], p[2]});
+        m[i] = mn >= 150 && mx - mn <= 60;
+    }
+    for (const Label& l : o.labels)  // the text
+        for (int y = std::max(0, l.y - 2); y < std::min(h, l.y + l.h + 2); ++y)
+            for (int x = std::max(0, l.x - 2); x < std::min(w, l.x + l.w + 2); ++x) m[(size_t)y * w + x] = 0;
+    struct Piece {
+        std::vector<int> px;
+        Box b;
+    };
+    std::vector<Piece> pieces;
+    size_t largest = 0;
+    components(m, w, h, [&](const std::vector<int>& comp, const Box& b) {
+        largest = std::max(largest, comp.size());
+        if (comp.size() < 4000) pieces.push_back({comp, b});
+    });
+    const size_t big = std::max<size_t>(800, largest / 50);
+    for (const Piece& pc : pieces) {
+        if (pc.px.size() >= big) continue;
+        // a closed loop: ground inside its box that cannot be reached from the box's edge
+        int bw = pc.b.w + 2, bh = pc.b.h + 2;
+        std::vector<uint8_t> g((size_t)bw * bh, 0);  // 1 = the piece, 2 = reached
+        for (int k : pc.px) g[(size_t)(k / w - pc.b.y + 1) * bw + k % w - pc.b.x + 1] = 1;
+        std::vector<int> q = {0};
+        g[0] = 2;
+        for (size_t i = 0; i < q.size(); ++i) {
+            int x = q[i] % bw, y = q[i] / bw;
+            for (auto [dx, dy] : {std::pair{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                int X = x + dx, Y = y + dy;
+                if (X < 0 || Y < 0 || X >= bw || Y >= bh || g[(size_t)Y * bw + X]) continue;
+                g[(size_t)Y * bw + X] = 2, q.push_back(Y * bw + X);
+            }
+        }
+        size_t inside = (size_t)bw * bh - q.size() - pc.px.size();
+        if (pc.px.size() >= 40 && inside >= 0.2 * pc.b.w * pc.b.h) continue;  // a pillar
+        for (int k : pc.px) std::fill_n(&im.px[(size_t)k * 3], 3, 0);
+    }
+}
+
 Added add(std::vector<Outline>& outlines, const Image& shotRaw) {
     Added r;
     Image shotIn = shotRaw;
@@ -531,6 +578,7 @@ Added add(std::vector<Outline>& outlines, const Image& shotRaw) {
     if (hits.empty()) {
         outlines.push_back(render(shot));
         r.into = (int)outlines.size() - 1;
+        clean(outlines.back());
         return r;
     }
     r.into = hits[0].first;
@@ -553,6 +601,7 @@ Added add(std::vector<Outline>& outlines, const Image& shotRaw) {
         sx += bx, sy += by;
         other = Outline{};
     }
+    clean(o);
     return r;
 }
 

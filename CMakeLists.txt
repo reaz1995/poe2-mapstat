@@ -66,6 +66,17 @@ add_custom_command(
   COMMENT "Embedding themes"
   VERBATIM)
 
+# Zone / act name tables are baked in too: tables/*.txt -> tables_gen.h
+file(GLOB TABLE_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/tables/*.txt")
+set(TABLES_HEADER "${CMAKE_BINARY_DIR}/generated/tables_gen.h")
+add_custom_command(
+  OUTPUT "${TABLES_HEADER}"
+  COMMAND ${CMAKE_COMMAND} -DTABLES_DIR=${CMAKE_SOURCE_DIR}/tables -DOUT=${TABLES_HEADER}
+          -P ${CMAKE_SOURCE_DIR}/cmake/embed_tables.cmake
+  DEPENDS ${TABLE_FILES} ${CMAKE_SOURCE_DIR}/cmake/embed_tables.cmake
+  COMMENT "Embedding zone / act tables"
+  VERBATIM)
+
 file(GLOB APP_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_SOURCE_DIR}/src/app/*.cpp" "${CMAKE_SOURCE_DIR}/src/app/*.h"       # Windows UI
   "${CMAKE_SOURCE_DIR}/src/core/*.cpp" "${CMAKE_SOURCE_DIR}/src/core/*.h"     # tracker (portable)
@@ -73,6 +84,7 @@ file(GLOB APP_SOURCES CONFIGURE_DEPENDS
 add_executable(Poe2MapStat WIN32
   ${APP_SOURCES}
   ${THEMES_HEADER}
+  ${TABLES_HEADER}
   res/app.rc            # manifest: visual styles + DPI aware
 )
 target_compile_options(Poe2MapStat PRIVATE -Wall -Wextra)

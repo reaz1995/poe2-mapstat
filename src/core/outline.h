@@ -49,7 +49,7 @@ struct Outline {
 };
 
 // Labels saved by an older version (found less well): the outline is better made again from its screenshots.
-inline bool oldLabels(const std::string& saved) { return saved.find("outline labels v4") == std::string::npos; }
+inline bool oldLabels(const std::string& saved) { return saved.find("outline labels v5") == std::string::npos; }
 std::string saveLabels(const std::vector<Label>& labels);  // text, one label per line
 std::vector<Label> loadLabels(const std::string& text);
 

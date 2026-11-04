@@ -1,0 +1,62 @@
+# Example steps for Poe2 | MapStat (paste into the Steps tab)
+# A zone at the start of a line, its steps under it indented by 2 spaces, details of a step by 4.
+# (op) before a step: optional. "Notes" under a zone: notes for that zone; at the start of a line: for every zone.
+
+The Riverbank
+  Kill the Bloated Miller
+  Go to Clearfell Encampment
+Clearfell Encampment
+  Talk to Renly
+  Buy a weapon upgrade if there is one
+Clearfell
+  Find the Mud Burrow entrance
+  Kill Beira of the Rotten Pack
+    Reward: cold resistance
+  Take the waypoint
+  Notes
+    Beira hits hard, bring a flask
+Mud Burrow
+  Kill the Devourer
+  Back to town, then The Grelwood
+The Grelwood
+  Find the entrance to The Red Vale
+  Take the waypoint
+The Red Vale
+  Activate the three Rust Obelisks
+  Kill the Rust King
+  Back to The Grelwood, find The Grim Tangle
+The Grim Tangle
+  Kill the Rotten Druid
+  Go to Cemetery of the Eternals
+Cemetery of the Eternals
+  Take the waypoint
+  Talk to Lachlann
+  Do Mausoleum of the Praetor and Tomb of the Consort
+Mausoleum of the Praetor
+  Kill Draven, the Eternal Praetor
+Tomb of the Consort
+  Kill Asinia, the Praetor's Consort
+  Back to the cemetery, kill Lachlann
+Hunting Grounds
+  (op) Kill the Crowbell
+    Reward: spirit
+  Find Freythorn and Ogham Farmlands
+Freythorn
+  Kill the King in the Mists
+Ogham Farmlands
+  Find Una's lute
+  Go to Ogham Village
+Ogham Village
+  Kill the Executioner
+  Free the villagers
+The Manor Ramparts
+  Take the waypoint
+Ogham Manor
+  Kill Candlemass
+  Kill Count Geonor
+
+Notes
+  Check the vendors for movement speed boots
+    every town
+  Keep resistances up before Act 2
+  Upgrade the flask that is empty most often

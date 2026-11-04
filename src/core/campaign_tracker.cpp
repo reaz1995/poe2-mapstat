@@ -1,6 +1,7 @@
 // Campaign zones: one timer per zone instance, acts, Reset Campaign Run.
 #include <cctype>
 
+#include "area_tables.h"
 #include "tracker.h"
 #include "string_util.h"
 
@@ -13,14 +14,11 @@ bool Tracker::isCampaign(const std::string& a) {
     return j > i + 1 && j < a.size() && a[j] == '_';
 }
 
+// Act of a campaign area from acts.txt (area_tables), its key ("G5") while the name is unknown.
 std::string Tracker::actOf(const std::string& a) {
     if (!isCampaign(a)) return "";
-    bool cruel = startsWith(a, "C_");
-    size_t i = cruel ? 2 : 0;
-    std::string num;
-    for (size_t j = i + 1; j < a.size() && isdigit((unsigned char)a[j]); ++j) num += a[j];
-    std::string r = (a[i] == 'P' ? "Interlude " : "Act ") + num;
-    return cruel ? r + " (Cruel)" : r;
+    std::string key = actKeyOf(a), name = actTable().name(key);
+    return name.empty() ? key : name;
 }
 
 void Tracker::closeZone(uint32_t tick) {
@@ -29,6 +27,7 @@ void Tracker::closeZone(uint32_t tick) {
         z.activeMs += (uint32_t)(tick - z.segStartTick);
         z.inSegment = false;
         z.leftTick = tick;
+        z.lastLeft = lastTime;
     }
 }
 

@@ -197,7 +197,7 @@ void showCmdBar(bool on) {
         int x = GetPrivateProfileIntW(kCbSec, L"X", 40, iniPath().c_str());
         int y = GetPrivateProfileIntW(kCbSec, L"Y", 220, iniPath().c_str());
         hCmdBar =
-            CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE, wc.lpszClassName,
+            CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE, wc.lpszClassName,
                             L"CommandBarOverlay", WS_POPUP, x, y, w, kCbH, nullptr, nullptr, wc.hInstance, nullptr);
         SetLayeredWindowAttributes(hCmdBar, 0, overlayAlpha(), LWA_ALPHA);
         hideFromCapture(hCmdBar);

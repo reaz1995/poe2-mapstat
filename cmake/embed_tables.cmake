@@ -1,0 +1,18 @@
+# Bakes tables/*.txt (zone and act names) into a C++ header, like the themes.
+#   cmake -DTABLES_DIR=<dir> -DOUT=<header> -P embed_tables.cmake
+file(GLOB files "${TABLES_DIR}/*.txt")
+list(SORT files)
+set(body "// generated from tables/*.txt - do not edit\n#pragma once\nstruct EmbeddedTable { const char* file; const char* text; };\nstatic const EmbeddedTable kEmbeddedTables[] = {\n")
+foreach(f ${files})
+  get_filename_component(name "${f}" NAME_WE)
+  file(READ "${f}" text)
+  string(APPEND body "    {\"${name}\", R\"area_table(${text})area_table\"},\n")
+endforeach()
+string(APPEND body "};\nstatic const int kEmbeddedTableCount = sizeof(kEmbeddedTables) / sizeof(kEmbeddedTables[0]);\n")
+if(EXISTS "${OUT}")
+  file(READ "${OUT}" old)
+  if(old STREQUAL body)
+    return()
+  endif()
+endif()
+file(WRITE "${OUT}" "${body}")

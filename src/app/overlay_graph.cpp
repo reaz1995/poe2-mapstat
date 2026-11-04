@@ -1,9 +1,11 @@
-// GraphOverlay: the graph of the zone the player is in (Layouts tab: Make graph, or any picture with "graph" in its
-// name). Without one it says so; with several, arrows on the left and right page through them (newest first).
+// Graph / outline overlay (GraphOverlay): the graphs and outlines of the zone the player is in (Layouts tab: Make
+// graph, any picture with "graph" in its name, and the "<seed>" outlines). Graphs come first, newest
+// first, then the outlines; arrows on the left and right page through them. A layout screenshot shows its outline.
+// Options can limit it to graphs.
 #include "app.h"
 
-HWND hGraphOv = nullptr, hGraphChk = nullptr;
-bool gGraphOn = false;
+HWND hGraphOv = nullptr, hGraphChk = nullptr, hGraphOnlyChk = nullptr;
+bool gGraphOn = false, gGraphOnly = false;
 
 namespace {
 
@@ -11,17 +13,41 @@ const wchar_t* kSec = L"GraphOverlay";
 const int kArrow = 30;  // width of the arrow areas at the sides
 const int kPad = 6;
 
-std::vector<std::wstring> gGraphs;  // of the current zone, newest first
+std::vector<std::wstring> gGraphs;  // pictures of the current zone: graphs, then outlines
 std::wstring gZoneName;  // shown when the zone has no graph
 int gIdx = 0;
-HBITMAP gPic = nullptr;  // the shown graph, scaled down once (it is scaled to the window when painted)
+HBITMAP gPic = nullptr;  // the shown picture, scaled down once (it is scaled to the window when painted)
 int gPicW = 0, gPicH = 0;
+RECT gCrop = {};  // the part with the map (outline pictures have wide empty margins)
+std::wstring gWant;  // a picture to show once it is listed (the outline of a screenshot just taken)
 int gHover = 0;  // -1 left arrow, 1 right arrow, 0 none
 
 void loadPicture() {
     if (gPic) DeleteObject(gPic);
     gPic = nullptr;
-    if (gIdx >= 0 && gIdx < (int)gGraphs.size()) gPic = layoutPicture(gGraphs[gIdx], 1100, 750, gPicW, gPicH);
+    if (gIdx >= 0 && gIdx < (int)gGraphs.size()) gPic = layoutPicture(gGraphs[gIdx], 1400, 900, gPicW, gPicH);
+    gCrop = {0, 0, gPicW, gPicH};
+    if (gPic) {  // crop to what is drawn
+        BITMAPINFO bi = {};
+        bi.bmiHeader.biSize = sizeof bi.bmiHeader;
+        bi.bmiHeader.biWidth = gPicW, bi.bmiHeader.biHeight = -gPicH;
+        bi.bmiHeader.biPlanes = 1, bi.bmiHeader.biBitCount = 32;
+        std::vector<uint32_t> px((size_t)gPicW * gPicH);
+        HDC dc = GetDC(nullptr);
+        if (GetDIBits(dc, gPic, 0, gPicH, px.data(), &bi, DIB_RGB_COLORS)) {
+            int x0 = gPicW, y0 = gPicH, x1 = -1, y1 = -1;
+            for (int y = 0; y < gPicH; ++y)
+                for (int x = 0; x < gPicW; ++x) {
+                    uint32_t p = px[(size_t)y * gPicW + x];
+                    if (((p >> 16) & 255) > 60 || ((p >> 8) & 255) > 60 || (p & 255) > 60)
+                        x0 = std::min(x0, x), y0 = std::min(y0, y), x1 = std::max(x1, x), y1 = std::max(y1, y);
+                }
+            if (x1 >= 0)
+                gCrop = {std::max(0, x0 - 10), std::max(0, y0 - 10), std::min(gPicW, x1 + 11),
+                         std::min(gPicH, y1 + 11)};
+        }
+        ReleaseDC(nullptr, dc);
+    }
     if (hGraphOv) InvalidateRect(hGraphOv, nullptr, FALSE);
 }
 
@@ -43,18 +69,20 @@ void paint(HDC dc, RECT rc) {
         SetBkMode(dc, TRANSPARENT);
         SelectObject(dc, fOvSmall ? fOvSmall : fNormal);
         SetTextColor(dc, C::Comment);
-        std::wstring t = gZoneName.empty() ? L"GraphOverlay: no graph here" : L"No graph for " + gZoneName;
+        std::wstring what = gGraphOnly ? L"graph" : L"graph or outline";
+        std::wstring t = gZoneName.empty() ? L"No " + what + L" here" : L"No " + what + L" for " + gZoneName;
         DrawTextW(dc, t.c_str(), -1, &area, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
         return;
     }
-    if (area.right > area.left && area.bottom > area.top) {  // fit, keep the shape
-        double s = std::min((double)(area.right - area.left) / gPicW, (double)(area.bottom - area.top) / gPicH);
-        int w = std::max(1, (int)(gPicW * s)), h = std::max(1, (int)(gPicH * s));
+    int cw = gCrop.right - gCrop.left, ch = gCrop.bottom - gCrop.top;
+    if (area.right > area.left && area.bottom > area.top && cw > 0 && ch > 0) {  // fit, keep the shape
+        double s = std::min((double)(area.right - area.left) / cw, (double)(area.bottom - area.top) / ch);
+        int w = std::max(1, (int)(cw * s)), h = std::max(1, (int)(ch * s));
         int x = (area.left + area.right - w) / 2, y = (area.top + area.bottom - h) / 2;
         HDC pdc = CreateCompatibleDC(dc);
         HGDIOBJ o = SelectObject(pdc, gPic);
         SetStretchBltMode(dc, HALFTONE);
-        StretchBlt(dc, x, y, w, h, pdc, 0, 0, gPicW, gPicH, SRCCOPY);
+        StretchBlt(dc, x, y, w, h, pdc, gCrop.left, gCrop.top, cw, ch, SRCCOPY);
         SelectObject(pdc, o);
         DeleteDC(pdc);
     }
@@ -67,7 +95,8 @@ void paint(HDC dc, RECT rc) {
         SetTextColor(dc, gHover == side ? C::Purple : C::Fg);
         DrawTextW(dc, side < 0 ? L"‹" : L"›", -1, &a, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     }
-    std::wstring n = std::to_wstring(gIdx + 1) + L"/" + std::to_wstring(gGraphs.size());
+    std::wstring n = std::to_wstring(gIdx + 1) + L"/" + std::to_wstring(gGraphs.size()) + L"  \u00b7  " +
+                     (isGraph(gGraphs[gIdx]) ? L"graph" : L"outline");
     RECT t = {rc.left, rc.bottom - 22, rc.right, rc.bottom - 4};
     SelectObject(dc, fOvSmall ? fOvSmall : fNormal);
     SetTextColor(dc, C::Comment);
@@ -198,24 +227,41 @@ LRESULT CALLBACK GraphProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
 }  // namespace
 
 void graphOverlayRefresh() {
-    std::vector<std::wstring> now = gGraphOn ? currentZoneGraphs() : std::vector<std::wstring>{};
-    std::wstring zone = W(g.locationName.empty() ? g.nameOf(g.location) : g.locationName);
+    std::vector<std::wstring> now = gGraphOn ? currentZonePictures(gGraphOnly) : std::vector<std::wstring>{};
+    std::wstring zone = W(g.locationDisplay());
     if (Tracker::isHideout(g.location)) zone.clear();
     if (zone != gZoneName && hGraphOv) InvalidateRect(hGraphOv, nullptr, FALSE);
     gZoneName = zone;
-    if (now == gGraphs) {
+    int want = -1;  // the outline of a screenshot just taken (its picture changed even if its name did not)
+    for (int i = 0; i < (int)now.size() && !gWant.empty(); ++i)
+        if (now[i] == gWant) want = i;
+    if (want >= 0) gWant.clear();
+    if (now == gGraphs && want < 0) {
         updateOverlayVisibility();
         return;
     }
     std::wstring shown = gIdx < (int)gGraphs.size() ? gGraphs[gIdx] : L"";
-    bool newer = !now.empty() && (gGraphs.empty() || now[0] != gGraphs[0]);  // a graph was just made: show it
+    bool newer = !now.empty() && isGraph(now[0]) && (gGraphs.empty() || now[0] != gGraphs[0]);  // a graph just made
     gGraphs = now;
     gIdx = 0;
-    if (!newer)
+    if (want >= 0) gIdx = want;
+    else if (!newer)
         for (int i = 0; i < (int)gGraphs.size(); ++i)
             if (gGraphs[i] == shown) gIdx = i;
     loadPicture();
     updateOverlayVisibility();
+}
+
+void graphOverlayShowPicture(const std::wstring& path) {
+    gWant = path;
+    graphOverlayRefresh();
+}
+
+void setGraphOnly(bool on) {
+    gGraphOnly = on;
+    WritePrivateProfileStringW(kSec, L"OnlyGraphs", on ? L"1" : L"0", iniPath().c_str());
+    if (hGraphOnlyChk) InvalidateRect(hGraphOnlyChk, nullptr, FALSE);
+    graphOverlayRefresh();
 }
 
 void graphOverlayTick() {
@@ -251,7 +297,7 @@ void showGraphOverlay(bool on) {
         bool saved = ini(L"X", -100000) != -100000;
         int x = saved ? ini(L"X", 40) : pos.left, y = saved ? ini(L"Y", 300) : pos.top;
         int w = saved ? ini(L"W", 420) : pos.right - pos.left, h = saved ? ini(L"H", 280) : pos.bottom - pos.top;
-        hGraphOv = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
+        hGraphOv = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
                                    wc.lpszClassName, L"GraphOverlay", WS_POPUP | WS_THICKFRAME, x, y, w, h, nullptr,
                                    nullptr, wc.hInstance, nullptr);
         SetLayeredWindowAttributes(hGraphOv, 0, overlayAlpha(), LWA_ALPHA);

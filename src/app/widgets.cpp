@@ -67,6 +67,7 @@ void drawButton(const DRAWITEMSTRUCT* d) {
                    : d->hwndItem == hTabCmp ? PG_CAMPAIGN
                    : d->hwndItem == hTabExp ? PG_EXPERIENCE
                    : d->hwndItem == hTabLay ? PG_LAYOUTS
+                   : d->hwndItem == hTabSteps ? PG_STEPS
                    : d->hwndItem == hGear   ? PG_OPTIONS
                                             : -1;
         bool active = page >= 0 && gPage == page;
@@ -88,9 +89,20 @@ void drawButton(const DRAWITEMSTRUCT* d) {
     }
 
     FillRect(dc, &r, brBg);
+    if (kind == Btn::Pill && (d->hwndItem == hOptPill[0] || d->hwndItem == hOptPill[1] || d->hwndItem == hOptPill[2])) {
+        bool sel = d->hwndItem == hOptPill[gOptPill];
+        fillRound(dc, r, 16, sel ? C::Purple : C::Card, sel ? C::Purple : hover ? C::Purple : C::Line);
+        SelectObject(dc, fBold);
+        SetTextColor(dc, sel ? C::Darkest : C::Fg);
+        DrawTextW(dc, text, -1, &r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        return;
+    }
     if (kind == Btn::Pill) {
-        bool sub = d->hwndItem == hSubSession || d->hwndItem == hSubSummary;  // Maps sub-tabs, else act pills
-        bool sel = sub ? gPage == (d->hwndItem == hSubSession ? PG_GENERAL : PG_SUMMARY) : W(gSelAct) == text;
+        bool lvl = d->hwndItem == hLvlCmp || d->hwndItem == hLvlMaps;  // level ups list mode
+        bool sub = lvl || d->hwndItem == hSubSession || d->hwndItem == hSubSummary;  // Maps sub-tabs, else act pills
+        bool sel = lvl   ? gLvlMaps == (d->hwndItem == hLvlMaps)
+                   : sub ? gPage == (d->hwndItem == hSubSession ? PG_GENERAL : PG_SUMMARY)
+                         : W(gSelAct) == text;
         bool here = !sub && g.curZone >= 0 && W(Tracker::actOf(g.zones[g.curZone].areaId)) == text;
         fillRound(dc, r, 16, sel ? C::Purple : C::Card, sel ? C::Purple : hover ? C::Purple : C::Line);
         SelectObject(dc, fBold);
@@ -106,7 +118,11 @@ void drawButton(const DRAWITEMSTRUCT* d) {
                   : d->hwndItem == hUpdChk     ? gAutoUpdate
                   : d->hwndItem == hCmdChk     ? gCmdOn
                   : d->hwndItem == hGraphChk   ? gGraphOn
+                  : d->hwndItem == hGraphOnlyChk ? gGraphOnly
+                  : d->hwndItem == hStepsChk   ? gStepsOn
                   : d->hwndItem == hClickChk   ? gClickThru
+                  : d->hwndItem == hCaptureChk ? gHideInCapture
+                  : d->hwndItem == hNotesChk   ? gStepsNotes
                   : d->hwndItem == hExpOvChk   ? gExpOnOverlay
                   : d->hwndItem == hLayCropChk ? gLayoutCrop
                                                : gOnTopOn;
@@ -253,7 +269,131 @@ COLORREF staticColor(HWND c) {
         c == hLblUpd || c == hLblKeys)
         return C::Pink;
     if (c == hDetLbl || c == hOptLbl || c == hUpdInfo) return C::Comment;
-    if (c == hRecVal || c == hAlphaVal) return C::Purple;
+    if (c == hRecVal || c == hAlphaVal || c == hStepsVal) return C::Purple;
+    if (c == hOvGeneralLbl || c == hOvEachLbl) return C::Comment;
     if (c == hSumHdr || c == hSummary || c == hCmpSum) return C::Cyan;
     return C::Fg;
+}
+
+// ---------------------------------------------------------------- slider
+
+namespace {
+struct SliderState {
+    int lo, hi, v;
+    bool hover;
+};
+SliderState* sliderOf(HWND h) { return (SliderState*)GetWindowLongPtrW(h, GWLP_USERDATA); }
+
+const int kThumb = 8;  // thumb radius
+
+void sliderPick(HWND h, int x) {
+    SliderState* s = sliderOf(h);
+    RECT rc;
+    GetClientRect(h, &rc);
+    int w = std::max(1, (int)rc.right - 2 * kThumb);
+    int v = s->lo + (int)std::lround((double)(x - kThumb) * (s->hi - s->lo) / w);
+    v = std::clamp(v, s->lo, s->hi);
+    if (v == s->v) return;
+    s->v = v;
+    InvalidateRect(h, nullptr, FALSE);
+    SendMessageW(hMain, WM_HSCROLL, SB_THUMBTRACK, (LPARAM)h);
+}
+
+LRESULT CALLBACK SliderProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
+    SliderState* s = sliderOf(h);
+    switch (msg) {
+        case WM_NCDESTROY:
+            delete s;
+            break;
+        case WM_GETDLGCODE:
+            return DLGC_WANTARROWS;
+        case WM_LBUTTONDOWN:
+            SetFocus(h);
+            SetCapture(h);
+            sliderPick(h, (short)LOWORD(lp));
+            return 0;
+        case WM_MOUSEMOVE:
+            if (GetCapture() == h) sliderPick(h, (short)LOWORD(lp));
+            if (!s->hover) {
+                s->hover = true;
+                InvalidateRect(h, nullptr, FALSE);
+                TRACKMOUSEEVENT t = {sizeof t, TME_LEAVE, h, 0};
+                TrackMouseEvent(&t);
+            }
+            return 0;
+        case WM_MOUSELEAVE:
+            s->hover = false;
+            InvalidateRect(h, nullptr, FALSE);
+            return 0;
+        case WM_LBUTTONUP:
+            if (GetCapture() == h) ReleaseCapture();
+            return 0;
+        case WM_MOUSEWHEEL:
+        case WM_KEYDOWN: {
+            int d = msg == WM_MOUSEWHEEL ? ((short)HIWORD(wp) > 0 ? 1 : -1)
+                    : wp == VK_RIGHT || wp == VK_UP ? 1
+                    : wp == VK_LEFT || wp == VK_DOWN ? -1
+                                                     : 0;
+            if (!d) break;
+            int v = std::clamp(s->v + d, s->lo, s->hi);
+            if (v != s->v) {
+                s->v = v;
+                InvalidateRect(h, nullptr, FALSE);
+                SendMessageW(hMain, WM_HSCROLL, SB_THUMBPOSITION, (LPARAM)h);
+            }
+            return 0;
+        }
+        case WM_SETFOCUS:
+        case WM_KILLFOCUS:
+            InvalidateRect(h, nullptr, FALSE);
+            break;
+        case WM_ERASEBKGND:
+            return 1;
+        case WM_PAINT: {
+            PAINTSTRUCT ps;
+            HDC dc = BeginPaint(h, &ps);
+            RECT rc;
+            GetClientRect(h, &rc);
+            FillRect(dc, &rc, brBg);
+            int cy = rc.bottom / 2, w = std::max(1, (int)rc.right - 2 * kThumb);
+            int x = kThumb + (int)std::lround((double)(s->v - s->lo) * w / std::max(1, s->hi - s->lo));
+            RECT track = {kThumb, cy - 2, rc.right - kThumb, cy + 2};
+            fillRound(dc, track, 4, C::Line, C::Line);
+            RECT done = {kThumb, cy - 2, x, cy + 2};
+            if (x > kThumb) fillRound(dc, done, 4, C::Purple, C::Purple);
+            RECT th = {x - kThumb, cy - kThumb, x + kThumb, cy + kThumb};
+            bool hot = s->hover || GetCapture() == h || GetFocus() == h;
+            fillRound(dc, th, kThumb * 2, hot ? C::Fg : C::Purple, C::Purple);
+            EndPaint(h, &ps);
+            return 0;
+        }
+    }
+    return DefWindowProcW(h, msg, wp, lp);
+}
+}  // namespace
+
+HWND slider(int id, int page, int lo, int hi) {
+    static bool reg = false;
+    if (!reg) {
+        WNDCLASSEXW wc = {};
+        wc.cbSize = sizeof wc;
+        wc.lpfnWndProc = SliderProc;
+        wc.hInstance = GetModuleHandleW(nullptr);
+        wc.hCursor = LoadCursor(nullptr, IDC_HAND);
+        wc.lpszClassName = L"Poe2MapStatSlider";
+        RegisterClassExW(&wc);
+        reg = true;
+    }
+    HWND h = mk(L"Poe2MapStatSlider", L"", WS_TABSTOP, id, fNormal, page);
+    SetWindowLongPtrW(h, GWLP_USERDATA, (LONG_PTR) new SliderState{lo, hi, lo, false});
+    return h;
+}
+
+int sliderValue(HWND h) { return sliderOf(h) ? sliderOf(h)->v : 0; }
+
+void setSliderValue(HWND h, int v) {
+    if (SliderState* s = sliderOf(h)) {
+        s->v = std::clamp(v, s->lo, s->hi);
+        InvalidateRect(h, nullptr, FALSE);
+    }
 }

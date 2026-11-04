@@ -26,6 +26,7 @@
 #include <thread>
 #include <vector>
 
+#include "steps.h"
 #include "theme.h"
 #include "tracker.h"
 #include "updater.h"
@@ -70,6 +71,7 @@ enum {
     ID_CMP_TIMER,
     ID_CMP_STATUS,
     ID_CMP_LIST,
+    ID_CMP_ACTLIST,
     ID_CMP_RESET,
     ID_LBL_CMP,
     ID_LBL_SUM,
@@ -85,9 +87,11 @@ enum {
     ID_REC_VAL,
     ID_REC_PLUS,
     ID_ALPHA_LBL,
-    ID_ALPHA_MINUS,
+    ID_ALPHA_SLIDER,
     ID_ALPHA_VAL,
-    ID_ALPHA_PLUS,
+    ID_OV_GENERAL,
+    ID_CAPTURE_CHK,
+    ID_OV_EACH,
     ID_CLOSE_CHK,
     ID_EXIT,
     ID_CMDBAR,
@@ -101,16 +105,10 @@ enum {
     ID_CMP_PAUSE,
     ID_CMP_STOP,
     ID_LBL_KEYS,
-    ID_KEY_LBL0,
-    ID_KEY_LBL1,
-    ID_KEY_LBL2,
-    ID_KEY_LBL3,
-    ID_KEY_BTN0,
-    ID_KEY_BTN1,
-    ID_KEY_BTN2,
-    ID_KEY_BTN3,
-    ID_KEYS_CHK,
     ID_TAB_EXP,
+    ID_LVL_CMP,
+    ID_LVL_MAPS,
+    ID_LVL_EXPORT,
     ID_EXP_NAME,
     ID_EXP_LEVEL,
     ID_EXP_AREA,
@@ -122,13 +120,35 @@ enum {
     ID_EXP_ROWLBL,
     ID_EXP_OVCHK,
     ID_EXP_HINT,
+    ID_EXP_LIST,
     ID_TAB_LAY,
-    ID_LAY_HINT,
     ID_LAY_FOLDER,
     ID_LAY_CROP,
     ID_LAY_GRAPH,
     ID_GRAPH_OV,
+    ID_GRAPH_ONLY,
     ID_CLICKTHRU,
+    ID_TAB_STEPS,
+    ID_LAY_IMPORT,
+    ID_STEPS_EDIT,
+    ID_STEPS_LIST,
+    ID_STEPS_IMPORT,
+    ID_STEPS_SAVE,
+    ID_STEPS_SAVEAS,
+    ID_STEPS_RESET,
+    ID_STEPS_INFO,
+    ID_STEPS_OV,
+    ID_STEPS_NOTES,
+    ID_OPT_PILL0,
+    ID_OPT_PILL1,
+    ID_OPT_PILL2,
+    ID_ZONES_IMPORT,
+    ID_STEPS_LBL,
+    ID_STEPS_MINUS,
+    ID_STEPS_VAL,
+    ID_STEPS_PLUS,
+    ID_KEY_LBL0 = 1600,  // + hotkey index
+    ID_KEY_BTN0 = 1620,  // + hotkey index
     ID_ACT_FIRST = 2000,
     ID_TIMER_POLL = 1,
     ID_TIMER_UPD = 2,
@@ -136,7 +156,16 @@ enum {
 };
 
 // Page indices
-enum { PG_GENERAL = 0, PG_SUMMARY = 1, PG_CAMPAIGN = 2, PG_OPTIONS = 3, PG_EXPERIENCE = 4, PG_LAYOUTS = 5, PG_COUNT };
+enum {
+    PG_GENERAL = 0,
+    PG_SUMMARY = 1,
+    PG_CAMPAIGN = 2,
+    PG_OPTIONS = 3,
+    PG_EXPERIENCE = 4,
+    PG_LAYOUTS = 5,
+    PG_STEPS = 6,
+    PG_COUNT
+};
 
 static const wchar_t* kDefaultLog =
     L"C:\\Program Files (x86)\\Steam\\steamapps\\common\\Path of Exile 2\\logs\\LatestClient.txt";
@@ -226,6 +255,15 @@ extern HWND hTitle, hStatus, hTimer, hDetLbl, hDetails, hSummary, hHist, hLblHis
 extern HWND hGenReset, hExpGen;
 extern HWND hSumHdr, hSumList, hSumReset, hExpSum, hLblSum;
 extern HWND hCmpTitle, hCmpTimer, hCmpStatus, hCmpList, hCmpReset, hExpCmp, hLblCmp, hCmpSum;
+extern HWND hCmpActList;  // the Summary pill: one row per act
+static const int kCmpActW[] = {170, 100, 90, 90, 90, 70, 100};
+void campaignTimerMenu(POINT pt);  // right-click on the campaign timer: Generate Summary
+void campaignShowLists();
+extern HWND hOptPill[3];  // Options: Overlays, Hotkeys, Theme
+extern int gOptPill;
+void setOptPill(int i);
+extern HWND hZonesImport;  // Options: Load zone names...
+void importAreaTables();         // the zone list or the act summary, for the pill chosen
 extern HWND hLblPath, hPath, hBrowse, hReload, hOnTop, hOptInfo, hOptLbl, hLoadHist, hRestoreGen, hRestoreCmp;
 extern HFONT fNormal, fBold, fTitle, fTimer, fSection, fTab;
 extern std::vector<HWND> gPages[PG_COUNT];
@@ -238,17 +276,24 @@ extern bool gOverlayOn;
 extern bool gStartInTray, gExiting;
 extern UINT gTaskbarCreated;  // explorer restarted -> add the tray icon again
 extern HWND hLblOverlay, hRecLbl, hRecMinus, hRecVal, hRecPlus, hCloseChk, hExitBtn;
-extern HWND hAlphaLbl, hAlphaMinus, hAlphaVal, hAlphaPlus;
+extern HWND hAlphaLbl, hAlphaSlider, hAlphaVal, hOvGeneralLbl, hOvEachLbl;
 extern HWND hCmdChk, hCmdBar;
 extern HWND hLblTheme, hThemeSel;
 extern HWND hLblUpd, hUpdChk, hUpdInfo, hUpdTab;
 extern bool gAutoUpdate;
 extern HWND hCmpTimerLoad;  // Campaign: zone time including its loading screens
 extern HWND hCmpPause, hCmpStop;
-extern HWND hLblKeys, hKeyLbl[4], hKeyBtn[4];
+extern HWND hLblKeys, hKeyLbl[], hKeyBtn[];  // one per hotkey (HK_COUNT)
 extern bool gHotkeysOn;  // always on (keys can be unset)
 extern HWND hTabExp, hExpName, hExpLevel, hExpArea, hExpTabEff, hExpMapEff, hExpGain, hExpInfo, hExpRowLbl, hExpOvChk,
-    hExpHint;
+    hExpHint, hExpList, hLvlCmp, hLvlMaps, hLvlExport;
+static const int kLvlW[] = {40, 220, 70, 80, 80, 110, 90, 150};  // level ups list
+void expListChanged();
+extern bool gLvlMaps;  // level ups list shows maps (else campaign zones)
+void setLevelMode(bool maps);  // level ups list sorted: filled again
+std::wstring expRequiredText();  // experience to the next level ("12.3M"), "" when the level is not known
+std::wstring expCampaignPerHourText(uint64_t campaignMs);  // the campaign run so far, "" if not known
+std::wstring expPerHourText();  // experience per hour of the last level that has a known time, "" if none
 extern std::wstring gExpName;
 extern int gExpLevel;
 extern int gTabEff, gMapEff, gExpGain;  // Experience tab: tablet / map effectiveness and tablet exp gain, in %
@@ -301,6 +346,11 @@ std::wstring lowerW(std::wstring s);
 std::wstring secs(double s);
 std::string readFileUtf8(const std::wstring& path);
 bool fileExists(const std::wstring& p);
+std::wstring getText(HWND h);  // a control's text
+// Windows' file / folder dialogs; empty when cancelled
+std::vector<std::wstring> pickFiles(HWND owner, const wchar_t* title, const wchar_t* filterName,
+                                    const wchar_t* filterSpec, const std::wstring& start = L"");
+std::wstring pickFolder(HWND owner, const wchar_t* title, const std::wstring& start = L"");
 std::wstring regString(HKEY root, const wchar_t* key, const wchar_t* value);
 
 // ---------------------------------------------------------------- theme_ui.cpp
@@ -363,6 +413,11 @@ LRESULT CALLBACK BtnProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD
 void measureMenu(MEASUREITEMSTRUCT* m);
 void drawMenu(const DRAWITEMSTRUCT* d);
 HWND mk(const wchar_t* cls, const wchar_t* txt, DWORD style, int id, HFONT f, int page, DWORD ex = 0);
+// Owner-drawn slider (min..max, step 1): drag, wheel or arrow keys; sends WM_HSCROLL (lParam = the slider) to the
+// main window while it changes.
+HWND slider(int id, int page, int lo, int hi);
+int sliderValue(HWND h);
+void setSliderValue(HWND h, int v);
 HWND btn(const wchar_t* txt, int id, int page, Btn kind);
 HWND label(const wchar_t* txt, int id, HFONT f, int page, bool onCard = false, DWORD extra = 0);
 COLORREF staticColor(HWND c);
@@ -378,7 +433,7 @@ void hideTip();
 void summaryHover(HWND lv, LPARAM lp);
 
 // ---------------------------------------------------------------- hotkeys.cpp
-enum { HK_STOP, HK_PAUSE, HK_START, HK_LAYOUT, HK_COUNT };
+enum { HK_STOP, HK_PAUSE, HK_START, HK_LAYOUT, HK_STEP_DONE, HK_STEP_UNDO, HK_COUNT };
 void loadHotkeys();
 void installKeyHook();
 void removeKeyHook();
@@ -406,7 +461,8 @@ void refreshCampaign(bool force);
 void placeActs();
 
 // ---------------------------------------------------------------- page_layouts.cpp
-extern HWND hLayHint, hLayFolder, hGallery, hLayCropChk, hLayGraph;
+extern HWND hLayFolder, hGallery, hLayCropChk, hLayGraph, hLayImport;
+void importLayouts();  // Import...: pictures into the selected zone, or a folder into the zones it names
 extern bool gLayoutCrop;  // Options: layout screenshot = selected area (snipping tool), else the whole game window
 void createLayoutsPage();
 void refreshLayouts();  // rescan the folders (page shown, hotkey changed)
@@ -414,11 +470,52 @@ void layoutsWatch();  // from the 0.5 s tick: refresh the tab when its folders c
 void openLayoutFolder();
 void toggleLayoutCrop();
 void makeLayoutGraph();  // points graph of the selected zone (src/core/outline_graph)
-std::vector<std::wstring> currentZoneGraphs();  // graph pictures of the zone the player is in, newest first
+std::vector<std::wstring> currentZonePictures(bool graphsOnly);  // graphs, then outlines of the current zone
+bool isGraph(const std::wstring& name);  // "graph" in the name
 HBITMAP layoutPicture(const std::wstring& path, int maxW, int maxH, int& w, int& h);  // scaled copy of a picture
 void takeLayoutShot();  // hotkey: Windows snipping, the picture is saved to the current zone
 void layoutClipboardUpdate();
 void layoutDone(LPARAM lp);  // WM_LAYOUT_DONE: a screenshot was saved / joined on the worker thread
+
+std::vector<std::wstring> knownZoneNames();  // campaign zones (in order), then other areas seen in the log
+
+// ---------------------------------------------------------------- page_steps.cpp
+extern HWND hTabSteps;
+void createStepsPage();
+void layoutStepsPage(int L, int T, int R, int B);
+void stepsCommand(int id, int code);
+void stepsAction(int hk);  // HK_STEP_DONE / HK_STEP_UNDO: the next step of the zone done / the last one undone
+void stepsChanged();  // steps or progress changed: overlay and tab
+void stepsTick();  // 0.5 s heartbeat: follows the zone
+void stepsHideSuggestions();  // the main window moved / lost the focus
+bool stepsDrawItem(DRAWITEMSTRUCT* d);  // the preset list (owner-drawn); false = not ours
+void stepsSaveOnExit();  // unsaved changes of the preset are kept
+std::wstring pickSaveFile(HWND owner, const wchar_t* title, const std::wstring& folder, const std::wstring& name,
+                          const wchar_t* ext);
+const std::vector<steps::Step>& stepsAll();
+steps::Progress& stepsProgress();
+std::wstring stepsZoneName();  // the zone the player is in ("" in hideouts)
+std::vector<int> stepsCurrent(bool* zoneSteps);  // steps of that zone
+std::vector<steps::Note> stepsNotes();  // notes for that zone, then the ones for every zone
+extern HWND hNotesChk;
+extern bool gStepsNotes;  // Steps tab: notes on the overlay
+void setStepsNotes(bool on);
+
+// ---------------------------------------------------------------- overlay_steps.cpp
+extern HWND hStepsOv, hStepsChk, hStepsLbl, hStepsMinus, hStepsVal, hStepsPlus;
+extern bool gStepsOn;
+extern int gStepsShown;  // Options: steps shown on the overlay (1-10)
+void showStepsOverlay(bool on);
+void stepsOverlayRefresh();
+bool stepsOverlayFixedHeight();  // its height was dragged (else it fits the steps)
+void stepsOverlayFitHeight();
+void setStepsShown(int n);
+
+// ---------------------------------------------------------------- area_tables_ui.cpp
+void loadAreaTables();  // baked tables/*.txt + %APPDATA%\Poe2MapStat\tables
+void areaTablesTick();  // 0.5 s: save new ids, reload edited files
+void areaTablesChanged();  // names changed: rename layout folders, refresh what shows names
+void layoutsFollowTables();  // page_layouts: folders named by an act key / zone id get the name the tables now know
 
 // ---------------------------------------------------------------- layout.cpp
 void showMapsPage();  // Maps tab: the sub-page shown last (Session or Summary)
@@ -451,22 +548,22 @@ void showOverlay(bool on);
 void showCmdBar(bool on);
 
 // ---------------------------------------------------------------- overlay_graph.cpp
-extern HWND hGraphOv, hGraphChk;
-// LayoutOverlay (overlay_layout.cpp): the outline of the current instance after a layout screenshot
-extern HWND hLayoutOv;
-bool layoutOverlayShown();
-void layoutOverlayShow(const std::wstring& outlinePath, uint32_t seed);
-void layoutOverlayHide();
-void layoutOverlayTick();  // from the 0.5 s tick: hides it in another instance
+extern HWND hGraphOv, hGraphChk, hGraphOnlyChk;
 uint32_t currentSeed();
 bool hideFromCapture(HWND h);  // left out of screenshots (Windows 10 2004+); false where not supported
 bool capturedOnScreen(HWND h);  // an overlay that screenshots would still show
+extern bool gHideInCapture;  // Options: overlays left out of screenshots
+extern HWND hCaptureChk;
+void setHideInCapture(bool on);
+bool hideCapturedOverlays(int ms);  // hides the overlays screenshots would show for ms; false = none to hide
 // Click-through overlays: clicks go to the game below, except while Alt is held (then they can be clicked / moved).
 extern bool gClickThru;
 extern HWND hClickChk;
 void setClickThru(bool on);
 void clickThruPoll();  // every 50 ms
-extern bool gGraphOn;
+extern bool gGraphOn, gGraphOnly;
+void setGraphOnly(bool on);  // Options: the graph overlay shows graphs only, no outlines
+void graphOverlayShowPicture(const std::wstring& path);  // show this picture (an outline just made)
 void showGraphOverlay(bool on);
 void graphOverlayRefresh();  // the zone or its graphs changed
 void graphOverlayTick();  // 0.5 s heartbeat: follows the zone the player is in

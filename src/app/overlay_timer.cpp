@@ -50,7 +50,7 @@ static bool gOvExp = false;
 
 static int ovHeight(double sc, int n) {
     return (
-        int)((kOvPad * 2 + kOvHead + (gOvExp ? 2 * kOvExp : 0) + (n ? 9 + n * kOvLine : 0) + (gOvFoot ? kOvFoot : 0)) *
+        int)((kOvPad * 2 + kOvHead + (gOvExp ? (gOvFoot ? 4 : 3) * kOvExp : 0) + (n ? 9 + n * kOvLine : 0) + (gOvFoot ? kOvFoot : 0)) *
                  sc +
              0.5);
 }
@@ -79,7 +79,7 @@ static void overlayDataNow(OvLine& head, std::vector<OvLine>& last, COLORREF& ti
         if (stoppedHere) {  // run finished: the header shows the final campaign time
             uint64_t total = 0;
             for (auto& z : g.zones) total += z.activeMs;
-            head = {std::to_wstring(g.locationLevel), W(g.locationName.empty() ? g.location : g.locationName),
+            head = {std::to_wstring(g.locationLevel), W(g.locationDisplay()),
                     W(fmtDuration(total))};
             timeCol = C::Red;
         } else {
@@ -100,7 +100,7 @@ static void overlayDataNow(OvLine& head, std::vector<OvLine>& last, COLORREF& ti
     }
     if (g.inHideoutNow) {
         // In a hideout: the hideout is the header (time of this stay), the paused map becomes the first record.
-        head = {std::to_wstring(g.locationLevel), W(g.locationName.empty() ? std::string("Hideout") : g.locationName),
+        head = {std::to_wstring(g.locationLevel), W(g.locationIsLoaded() && !g.locationName.empty() ? g.locationName : std::string("Hideout")),
                 W(fmtDuration((uint32_t)(now - g.hideoutStayTick)))};
         timeCol = C::Orange;
         if (g.hasCurrent && last.size() < want)
@@ -117,7 +117,7 @@ static void overlayDataNow(OvLine& head, std::vector<OvLine>& last, COLORREF& ti
         }
         timeCol = g.cur.state == RunState::Paused ? C::Orange : g.cur.state == RunState::Loading ? C::Cyan : C::Purple;
     } else {
-        head = {L"", W(g.locationName.empty() ? std::string("No active map") : g.locationName), L"00:00"};
+        head = {L"", W(g.location.empty() ? std::string("No active map") : g.locationDisplay()), L"00:00"};
     }
     for (size_t i = g.history.size(); i > g.generalStart && last.size() < want; --i) {
         const Run& p = g.history[i - 1];
@@ -183,7 +183,7 @@ static void paintOverlay(HDC dc, RECT rc) {
         if (gOvExp) h.lvl.clear(), h.range.clear();  // the area level moves to the experience line below
         line(h, P, HH, fOvHead, C::Pink, C::Fg, timeCol);
     }
-    const int XL = (int)(kOvExp * S), XH = gOvExp ? 2 * XL : 0;
+    const int XL = (int)(kOvExp * S), XH = gOvExp ? (gOvFoot ? 4 : 3) * XL : 0;  // 4th line in the campaign
     if (gOvExp) {
         // Line 1: "Curr. area: 64 (56-64)  Your lvl: 88" and the exp bonus of the current area. The area level is
         // red when it is outside the safe range (3 + level / 16 levels around the character), the range in small
@@ -266,6 +266,36 @@ static void paintOverlay(HDC dc, RECT rc) {
         };
         expLine(P + HH, line1, mArea, vArea);
         expLine(P + HH + XL, line2, mBest, vBest);
+        // Line 3: experience to the next level, and exp/h of the last level gained in one zone ("In Between"); line 4
+        // in the campaign: exp/h of the whole run ("Total")
+        auto rightValue = [&](int y, const wchar_t* cap, const std::wstring& val) {
+            RECT rr = {P, y, rc.right - P, y + XL};
+            std::wstring v = val.empty() ? L"-" : val;
+            SelectObject(dc, fOvSmall);
+            SetTextColor(dc, C::Cyan);
+            DrawTextW(dc, v.c_str(), -1, &rr, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+            rr.right -= textW(v, fOvSmall) + (int)(5 * S);
+            SetTextColor(dc, C::Comment);
+            DrawTextW(dc, cap, -1, &rr, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+        };
+        {
+            std::wstring req = expRequiredText(), eph = expPerHourText();
+            int y = P + HH + 2 * XL;
+            RECT r = {P, y, rc.right - P, y + XL};
+            SelectObject(dc, fOvSmall);
+            std::wstring cap = shortCaps ? L"Req:" : L"Required exp:";
+            SetTextColor(dc, C::Comment);
+            DrawTextW(dc, (cap + L" ").c_str(), -1, &r, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            r.left += textW(cap + L" ", fOvSmall);
+            SetTextColor(dc, C::Cyan);
+            DrawTextW(dc, (req.empty() ? L"-" : req).c_str(), -1, &r, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            rightValue(y, L"In Between:", eph);
+            if (gOvFoot) {
+                uint64_t total = 0;
+                for (auto& z : g.zones) total += z.activeAt(nowTick());
+                rightValue(y + XL, L"Total:", expCampaignPerHourText(total));
+            }
+        }
     }
     HBRUSH b;
     if (gOvRecords > 0) {
@@ -368,10 +398,11 @@ void setOverlayTransparency(int pct) {
     gOvTransparency = std::clamp(pct, 0, 100);
     ovIniSet(L"Transparency", gOvTransparency);
     SetWindowTextW(hAlphaVal, (std::to_wstring(gOvTransparency) + L"%").c_str());
+    if (hAlphaSlider && sliderValue(hAlphaSlider) != gOvTransparency) setSliderValue(hAlphaSlider, gOvTransparency);
     if (hOverlay) SetLayeredWindowAttributes(hOverlay, 0, overlayAlpha(), LWA_ALPHA);
     if (hCmdBar) SetLayeredWindowAttributes(hCmdBar, 0, overlayAlpha(), LWA_ALPHA);
     if (hGraphOv) SetLayeredWindowAttributes(hGraphOv, 0, overlayAlpha(), LWA_ALPHA);
-    if (hLayoutOv) SetLayeredWindowAttributes(hLayoutOv, 0, overlayAlpha(), LWA_ALPHA);
+    if (hStepsOv) SetLayeredWindowAttributes(hStepsOv, 0, overlayAlpha(), LWA_ALPHA);
 }
 
 // Campaign footer: shown whenever the player is in a campaign zone. Experience lines: when turned on.
@@ -481,7 +512,7 @@ void showOverlay(bool on) {
         int y = ovIniInt(L"Y", 40);
         int w = ovIniInt(L"W", kOvW);
         int h = ovIniInt(L"H", ovHeight((double)w / kOvW, gOvRecords));
-        hOverlay = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
+        hOverlay = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
                                    wc.lpszClassName, L"MapTimerOverlay", WS_POPUP | WS_THICKFRAME, x, y, w, h, nullptr,
                                    nullptr, wc.hInstance, nullptr);
         SetLayeredWindowAttributes(hOverlay, 0, overlayAlpha(), LWA_ALPHA);
