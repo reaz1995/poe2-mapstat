@@ -17,7 +17,17 @@
   you type; new StepsOverlay with the steps of the zone you are in (done ones green), marked with the new Complete
   step / Undo step hotkeys, done/total in its corner, double-click opens the Steps tab, number of steps set in Options
 - StepsOverlay: top and bottom edges resize it too (a fixed height; right-click → Fit height to steps)
-- Campaign: Summary pill once the run is stopped (or right-click the timer → Generate Summary): per act its time,
+- Campaign: Session / Summary pills. Summary lists every saved run with its act and campaign times, ★ on the best
+  ones; Ctrl + click runs to compare them (the first is the base, the others as +/- per act); double-click loads a
+  run; right-click pins it for the overlay, renames or removes it (Remove takes all the selected runs; a removed pinned run unpins); hover an act's time for its zones (in the comparison, each zone's difference to the base); Include loading time;
+  columns can be moved; Export to CSV for the runs and for the comparison;
+  Import from file adds a run; the how-to shows when hovering a list's title
+- MapTimerOverlay: Time Comparison AddOn (Options): the zone timer shows (+5s) / (-10s) against the pinned run, or
+  the best time of all saved runs; the footer adds the previous act with its difference (Act 1: 15:12 (+3m15s)) and the
+  current act turns red with its difference once it is behind
+- Campaign: Pause / Resume, Stop and Save and Clear (was Reset Campaign Run) moved to the timer's right-click menu;
+  Export to CSV under the pills; Restore campaign session replaced by the Summary pill
+- Campaign: Act Summary pill once the run is stopped (or right-click the timer → Generate Act Summary): per act its time,
   start / end, loading time, zones and average time per zone; the Start button after Stop is now Reset
 - Steps: the preset is saved by itself 1 s after you stop typing
 - Steps: `From -> Zone` headers, steps shown only when coming from that zone (else the plain zone steps)
@@ -27,11 +37,12 @@
   is gone); the editor has a thin scroll bar in the theme's colours
 - Options: Load zone names... (zones.txt / acts.txt, e.g. from download/ZoneNames); the Guide preset is built into
   the app (no file)
-- Options: the MapTimerOverlay experience lines checkbox moved there from the Experience tab
+- Options: the MapTimerOverlay experience lines checkbox (Experience AddOn) moved there from the Experience tab
 - Options: Check for updates on start next to Always on top; Layouts: the tip about the screenshot key is gone
 - Steps editor: `+ Header` ... `+` sections fold into one line on double-click
 - StepsOverlay: the notes are a footer at the bottom of the window, always shown in full like the header (the
   window is never smaller than both); the steps fill the space between
+- Steps tab: Reset progress and the info line sit at the right edge
 - StepsOverlay: click a line (Alt + click with click-through) to copy it, the hovered line is underlined
 - StepsOverlay: done steps are left out except the last one before the next step; reward lines in muted gold
 - Steps: a zone's own Notes are shown instead of the Notes for every zone

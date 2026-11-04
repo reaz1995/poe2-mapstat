@@ -613,6 +613,26 @@ void stepsAction(int hk) {
     stepsChanged();
 }
 
+// Reset progress and the info line sit at the right edge, so they follow the info text's width.
+static int gFootX, gFootR, gFootY;
+
+static void placeFooterRight() {
+    if (!hInfo || gFootR <= gFootX) return;
+    wchar_t buf[512];
+    GetWindowTextW(hInfo, buf, 512);
+    HDC dc = GetDC(hInfo);
+    HGDIOBJ old = SelectObject(dc, (HGDIOBJ)SendMessageW(hInfo, WM_GETFONT, 0, 0));
+    SIZE sz = {};
+    GetTextExtentPoint32W(dc, buf, lstrlenW(buf), &sz);
+    SelectObject(dc, old);
+    ReleaseDC(hInfo, dc);
+    const int resetW = 140, rh = 32;
+    int iw = std::min<int>(sz.cx + 4, gFootR - gFootX - resetW - 16);
+    if (iw < 0) iw = 0;
+    place(hInfo, gFootR - iw, gFootY + 7, iw, 20);
+    place(hReset, gFootR - iw - (iw ? 16 : 0) - resetW, gFootY, resetW, rh);
+}
+
 void stepsChanged() {
     stepsOverlayRefresh();
     if (!hInfo) return;
@@ -626,6 +646,7 @@ void stepsChanged() {
     std::wstring t = gCur + L"  ·  " + std::to_wstring(gSteps.size()) + L" steps  ·  " + std::to_wstring(done) + L" done";
     if (!list.empty()) t += L"  ·  " + z + L": " + std::to_wstring(here) + L"/" + std::to_wstring(list.size());
     setTextIfChanged(hInfo, t);
+    placeFooterRight();
 }
 
 // ---------------------------------------------------------------- page
@@ -1056,11 +1077,12 @@ void layoutStepsPage(int L, int T, int R, int B) {
     gSbShown = -1;
     syncScroll();
     int x = L;
-    for (auto [h, w] : {std::pair{hImport, 110}, {hSave, 90}, {hSaveAs, 110}, {hReset, 140}}) {
+    for (auto [h, w] : {std::pair{hImport, 110}, {hSave, 90}, {hSaveAs, 110}}) {
         place(h, x, B - rh, w, rh);
         x += w + 8;
     }
-    place(hInfo, x + 8, B - rh + 7, R - x - 8, 20);
+    gFootX = x, gFootR = R, gFootY = B - rh;
+    placeFooterRight();
     hideAc();
 }
 

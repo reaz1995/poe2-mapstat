@@ -30,10 +30,16 @@ void pollLog() {
     bool replayed = false;
     HANDLE h = CreateFileW(gLogPath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                            nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h == INVALID_HANDLE_VALUE) { gFileOk = false; return; }
+    if (h == INVALID_HANDLE_VALUE) {
+        gFileOk = false;
+        return;
+    }
     gFileOk = true;
     BY_HANDLE_FILE_INFORMATION info;
-    if (!GetFileInformationByHandle(h, &info)) { CloseHandle(h); return; }
+    if (!GetFileInformationByHandle(h, &info)) {
+        CloseHandle(h);
+        return;
+    }
     uint64_t size = ((uint64_t)info.nFileSizeHigh << 32) | info.nFileSizeLow;
     std::string head(256, '\0');
     {
@@ -49,11 +55,9 @@ void pollLog() {
     if (!firstOpen && !newSession && size < gOffset) {
         // Same session but the file is shorter (being rewritten by the game). Keep the read position:
         // nothing is re-read, reading continues once the file grows past the old position.
-        gShrunk = true;
         CloseHandle(h);
         return;
     }
-    gShrunk = false;
     if (firstOpen || newSession) {
         // First open: track only (unless "Load history"). New session while running: everything in the
         // new file happened after the app started, so it is read from the start.
@@ -73,7 +77,10 @@ void pollLog() {
                 std::stringstream fl(first);
                 for (std::string ln; std::getline(fl, ln);) {
                     LogLine ll;
-                    if (parseLine(ln, ll)) { g.sessionStart = ll.date + " " + ll.time; break; }
+                    if (parseLine(ln, ll)) {
+                        g.sessionStart = ll.date + " " + ll.time;
+                        break;
+                    }
                 }
             }
             uint64_t from = size > tail.size() ? size - tail.size() : 0;
@@ -86,9 +93,13 @@ void pollLog() {
             size_t lastNl = t.rfind('\n');
             if (lastNl != std::string::npos) {
                 size_t prev = t.rfind('\n', lastNl ? lastNl - 1 : 0);
-                std::string line = t.substr(prev == std::string::npos ? 0 : prev + 1, lastNl - (prev == std::string::npos ? 0 : prev + 1));
+                std::string line = t.substr(prev == std::string::npos ? 0 : prev + 1,
+                                            lastNl - (prev == std::string::npos ? 0 : prev + 1));
                 LogLine ll;
-                if (parseLine(line, ll)) { g.lastTick = ll.tick; g.lastTime = ll.time; }
+                if (parseLine(line, ll)) {
+                    g.lastTick = ll.tick;
+                    g.lastTime = ll.time;
+                }
                 gOffset = from + lastNl + 1;
                 // Game running: replay from the last area change, so the current map, hideout or zone is
                 // active at once (otherwise nothing shows until the next area change). A stored row of the same

@@ -51,6 +51,15 @@ moves to the records, orange), back into the same map (the timer continues), the
 
 *(The screenshots are from an earlier version.)*
 
+| Tab | For |
+|---|---|
+| [Maps](#maps) | the maps of the session, and a summary per map type |
+| [Campaign](#campaign) | the campaign run zone by zone, and all saved runs side by side |
+| [Experience](#experience) | the experience of your level and area, and every level up |
+| [Layouts](#layouts) | your screenshots of zone and map layouts, outlines and graphs |
+| [Steps](#steps) | your leveling notes per zone, for the StepsOverlay |
+| [Options (⚙)](#options-) | log file, overlays, hotkeys, theme |
+
 All lists work the same way: drag a column header to move the column, right-click a header to sort (ascending /
 descending / default) or to hide and show columns, and type in the search box next to the first column title to
 filter by name or area id (Esc clears it). Order, sorting and hidden columns are remembered, and **Export to CSV**
@@ -58,10 +67,12 @@ saves the list as it is shown.
 
 ### Maps
 
-Two pills at the top.
+Two pills at the top: **Session** (the maps of this session) and **Summary** (one row per map type).
 
-**Session** shows the map you are in (timer, area level, seed, hideout returns, sub-areas) and every map of the
-session with its load time, map time and entries. Right-click the *Map* header to filter: All / Maps / Expedition /
+#### Session
+
+The top shows the map you are in (timer, area level, seed, hideout returns, sub-areas); the list under it every map
+of the session with its load time, map time and entries. Right-click the *Map* header to filter: All / Maps / Expedition /
 Special. Sub-areas (Abyssal Depths with their faction, Lightless Void, Dark Domain, Expedition boss arenas) count
 towards the map they were opened from.
 
@@ -72,36 +83,68 @@ towards the map they were opened from.
 | Restore map session... | loads an older map session file |
 | Load past Map session events... | rebuilds the list from the game's logs, see [Pulling back old data](#pulling-back-old-data) |
 
-**Summary** has one row per map type: plays, total, average and best time, and the area level range (hover the *Area
+#### Summary
+
+One row per map type: plays, total, average and best time, and the area level range (hover the *Area
 Lvl* cell for the plays per level). Maps that were generated but never entered are not counted. Summary keeps its own
 history: resetting, restoring or loading past events only adds maps to it, each instance once. Only **Reset Summary**
 clears it.
 
 ### Campaign
 
+Two pills at the top: **Session** (the run you are playing) and **Summary** (every saved run).
+
+#### Session
+
 The big timer is the time of the zone you are in; the smaller one under it includes the loading screens. All other
-times on this tab leave loading screens out.
+times leave loading screens out. Right-click the timer for the run's controls:
 
-The pills: **Campaign** shows the whole run (the timer then shows the campaign time), then one pill per act in the
-order you played them, picked automatically as you move on. Each zone instance is one row: area level, area id, seed,
-first and last entered, entries, time, load time and average load. Coming back to the same instance within an hour
-continues its row; towns keep adding up.
-
-Once the run is stopped a **Summary** pill is added at the end and opened. It lists every act in the order played
-with its time, start and end, loading time, number of zones (towns not counted) and average time per zone, and a
-last row for the whole campaign. Right-click the big timer and pick *Generate Summary* to see it during a run.
-
-| Button / hotkey | What it does |
+| Timer menu | What it does |
 |---|---|
-| Pause / Resume | stops counting time; zones you enter are still listed |
-| Stop | ends the run: the times freeze and nothing is tracked until a new run starts |
-| Reset (after Stop) | starts a new run from zero (the stopped run stays restorable) |
-| Reset Campaign Run | starts a new run right away |
-| Export to CSV | saves the pill shown (the whole run, one act or the summary), the file named after it |
-| Restore campaign session... | loads an older campaign session file |
+| Pause / Resume | stops counting time; zones you enter are still listed (greyed out once the run is stopped) |
+| Stop | ends the run: the times freeze and nothing is tracked until a new run starts (Save and Clear) |
+| Generate Act Summary | adds the Act Summary pill below for a run still going |
+| Save and Clear | keeps the run in the saved runs and starts a new one from zero (asks first) |
+
+Under **ZONES** are the pills: *Campaign* for the whole run, then one per act in the order you played them, picked
+automatically as you move on. Each zone instance is one row: area level, area id, seed, first and last entered,
+entries, time, load time and average load. Coming back to the same instance within an hour continues its row.
+
+Once the run is stopped an **Act Summary** pill is added: one row per act with its time, start and end, loading time,
+number of zones (towns not counted) and average per zone, and a row for the whole campaign. **Export to CSV**, under
+the pills, saves the pill shown.
 
 The hotkeys for Stop, Pause / resume and Start new run are set in Options (none at first). They work while the game
 or the app is in front, and the key still reaches the game.
+
+#### Summary
+
+Two lists: **Saved runs** on top and the **Comparison** of the selected runs under it. Hover a list's title for a
+short how-to. *Include loading time* (under the pills) adds the loading screens to every time on this page.
+
+**Saved runs** - every run, newest first, with one column per act and the campaign time; the run being played is
+green. A ★ marks the best time of all runs for each act (finished acts only: another act came after it, or the run
+was stopped) and for the campaign (stopped runs only).
+
+| Action | What it does |
+|---|---|
+| Click / **Ctrl + click** | selects a run / adds or removes one from the comparison (the selection is remembered) |
+| Double-click | loads the run (the one being played is saved first) |
+| Hover an act's time | its zones and their times (towns left out; a zone played more than once shows its fastest instance) |
+| Right-click → **Pin for overlay comparison** | the overlay compares with this run (📌 before its name); *Unpin* takes it off |
+| Right-click → **Rename** | a name of your own (empty = back to the date) |
+| Right-click → **Remove** | the run's file goes to the Recycle Bin; with several runs selected, all of them |
+| **Import from file...** | adds a campaign run file (from another PC or a backup); a file with another name gets a new one and keeps its old name as the run's name |
+| **Export to CSV** | saves the list |
+
+A removed run leaves the comparison, and if it was pinned the overlay goes back to comparing with the best times.
+
+**Comparison** - the first selected run is the base and shows its times; each other selected run shows the
+difference to it per act and for the campaign: `+15s`, `-25s`, `+2m03s` (green = faster, red = slower). Hover an act:
+the base shows its zone times, the other runs each zone's difference to the base (a zone only one of the two has
+counts with its whole time). **Export to CSV** saves this list.
+
+Drag a column header to move it; both lists keep the same order.
 
 ### Experience
 
@@ -129,7 +172,7 @@ name, earlier level ups are read from `Client.txt` in the background; new ones a
 given for a level gained wholly in one zone (no town visit, zone change or relog during it); the others show `-`.
 **Export to CSV** saves the pill shown. Kept in `%APPDATA%\Poe2MapStat\levelups\<name>.tsv`.
 
-The experience lines on the timer overlay are turned on in Options (see [Overlays](#overlays)).
+The experience lines on the timer overlay are the *Experience AddOn* in Options (see [Overlays](#overlays)).
 
 ### Layouts
 
@@ -231,7 +274,7 @@ screenshots*. Then one row per overlay with its own options on the right:
 
 | Overlay | Options | Default |
 |---|---|---|
-| MapTimerOverlay | recent records (0-10), *Experience lines* | on, 4, off |
+| MapTimerOverlay | recent records (0-10), *Experience AddOn* (area level, exp bonus, required exp, exp/h), *Time Comparison AddOn* (zone and act times against the pinned or best run) | on, 4, off, off |
 | CommandBarOverlay | | off |
 | Graph / outline overlay | *Only graphs* | off |
 | StepsOverlay | steps shown (1-10), *Show notes* | off, 5, on |
@@ -265,7 +308,7 @@ map it shows the map time again, which includes the time of its sub-areas. In ca
 current act and the whole campaign, e.g. `Act 1: 12:40` and `Campaign: 1:05:12`. Zones whose level follows your
 character level show their range in small print after the level, e.g. `53 (47-52)`. Double-click opens the app.
 
-With *Experience lines* on (Options), these lines appear under the header (not in hideouts and towns):
+With the *Experience AddOn* on (Options), these lines appear under the header (not in hideouts and towns):
 
 | Line | Meaning |
 |---|---|
@@ -280,6 +323,12 @@ On a narrow overlay the captions are shorter (`Area:`, `Lvl:`, `Best:`, `Exp:`, 
 ![Timer overlay with the experience lines (level 60 in an area 64)](docs/overlay-exp.png)
 
 Timer colours: purple = running, cyan = loading, orange = paused / hideout. Campaign: yellow = paused, red = stopped.
+
+With the *Time Comparison AddOn* on (Options), a campaign zone's timer has the difference to the pinned run (Campaign →
+Summary, right-click → Pin) next to it, or with nothing pinned to the best time of all saved runs in that zone:
+`(-10s)` in green while you are ahead, `(+5s)` in red once you are behind. Towns are not compared. The footer then also
+shows the act you just finished with its difference, e.g. `Act 1: 15:12 (+3m15s)` above `Act 2: 04:10`, and the
+current act's time turns red with its difference once it is slower than the act's time to beat.
 
 **CommandBarOverlay** - *Hideout* and *Exit* buttons that type `/hideout` or `/exit` into the game chat.
 
@@ -322,7 +371,7 @@ Everything is saved in `%APPDATA%\Poe2MapStat\sessions\` every 10 seconds and wh
 | File | Content | Reset with | Restore with |
 |---|---|---|---|
 | `MapSession <start date>.tsv` | maps of the Maps tab | **Reset Session** | Maps → **Restore map session...** |
-| `CampaignSession <start date>.tsv` | campaign zones | **Reset Campaign Run** / **Reset** after Stop | Campaign → **Restore campaign session...** |
+| `CampaignSession <start date>.tsv` | campaign zones | timer menu → **Save and Clear** | Campaign → Summary, double-click the run |
 | `SummarySession <start date>.tsv` | what Summary counts | **Reset Summary** | - |
 
 A reset never deletes anything: the current file keeps the state from before the reset and the app continues in a new
@@ -388,14 +437,14 @@ g++ -std=c++20 -O2 -Isrc/core tools/replay.cpp src/core/*.cpp -o replay && ./rep
 
 ### Releasing an update
 
-The version lives in the `VERSION` file (e.g. `1.1.5`); CMake reads it for the app.
+The version lives in the `VERSION` file (e.g. `1.1.7`); CMake reads it for the app.
 
 1. Change `VERSION` to the new version.
 2. Overwrite `CHANGES.md` with what changed in this version (one `- ` line per change).
 3. Commit and push to `main`.
 
 `.github/workflows/release.yml` then builds the Release exe on GitHub (llvm-mingw on Linux, `GITHUB_REPO` set to this
-repository) and publishes the release `v1.1.5` with `Poe2MapStat.exe` attached and `CHANGES.md` as the release notes (the app shows them when it offers the update; without
+repository) and publishes the release `v1.1.7` with `Poe2MapStat.exe` attached and `CHANGES.md` as the release notes (the app shows them when it offers the update; without
 `CHANGES.md` GitHub generates notes from the commits).
 A push that doesn't change the version does nothing. It can also be started by hand under *Actions → Release → Run
 workflow*.
@@ -410,7 +459,7 @@ src/core/      tracker, experience, layout outlines and points graph; no Windows
   log_line          parse one log line
   tracker           event dispatch: area changes, loading screens, scenes, level ups, disconnects
   map_tracker       map runs, segments of play time, hideout returns, Maps/Summary resets
-  campaign_tracker  campaign zones, acts, Reset Campaign Run, pause / stop
+  campaign_tracker  campaign zones, acts, clear, pause / stop
   experience        experience table, safe range, area and penalty multipliers
   levelups          level ups of a character: read from the log, kept per character
   steps             Steps tab text: zones and steps, which to show, done / undo

@@ -5,12 +5,16 @@ struct Agg {
     std::string name;
     int count = 0, minLvl = 999, maxLvl = 0;
     uint64_t totalMs = 0, bestMs = UINT64_MAX;
-    int runCount = 0;        // part of count that are runs of their own (sub-area visits are inside a map's time)
+    int runCount = 0;  // part of count that are runs of their own (sub-area visits are inside a map's time)
     uint64_t runMs = 0;
 };
 
 // Small themed popup (not a system tooltip, so it follows the colours of the loaded theme).
-struct TipRow { int lvl; int count; uint64_t ms; };
+struct TipRow {
+    int lvl;
+    int count;
+    uint64_t ms;
+};
 
 static std::vector<TipRow> levelBreakdown(const std::string& areaId);
 static void paintTip(HDC dc, RECT rc);
@@ -52,7 +56,7 @@ void refreshSummary() {
     for (auto& [id, a] : rows) {
         if (!searchMatch(hSumList, areaName(a.name, id), W(id))) continue;
         ++kinds;
-        maps += a.runCount;   // header: maps played / time once (sub-area time is already inside its map)
+        maps += a.runCount;  // header: maps played / time once (sub-area time is already inside its map)
         subVisits += a.count - a.runCount;
         total += a.runMs;
         std::wstring lvl = a.minLvl == a.maxLvl ? std::to_wstring(a.minLvl)
@@ -63,11 +67,13 @@ void refreshSummary() {
     }
     sortRows(hSumList, lv);
     writeRows(hSumList, lv);
-    setTextIfChanged(hSumHdr, std::to_wstring(kinds) + L" different maps  \u00b7  " + std::to_wstring(maps) +
-                                  L" played  \u00b7  total " + W(fmtDuration(total)) + L"  \u00b7  average " +
-                                  W(fmtDuration(maps ? total / maps : 0)) +
-                                  (subVisits ? L"  \u00b7  " + std::to_wstring(subVisits) + L" sub-area visits (time inside their maps)" : L"") +
-                                  (withCur ? L"  (incl. current map)" : L""));
+    setTextIfChanged(
+        hSumHdr,
+        std::to_wstring(kinds) + L" different maps  \u00b7  " + std::to_wstring(maps) + L" played  \u00b7  total " +
+            W(fmtDuration(total)) + L"  \u00b7  average " + W(fmtDuration(maps ? total / maps : 0)) +
+            (subVisits ? L"  \u00b7  " + std::to_wstring(subVisits) + L" sub-area visits (time inside their maps)"
+                       : L"") +
+            (withCur ? L"  (incl. current map)" : L""));
 }
 
 static HWND hTip = nullptr;
@@ -75,6 +81,7 @@ static HWND hTip = nullptr;
 static std::wstring gTipKey, gTipTitle;
 
 static std::vector<TipRow> gTipRows;
+static std::vector<std::pair<std::wstring, std::wstring>> gTipLines;  // or plain lines: text left, value right
 
 static const int kTipPad = 10, kTipLine = 20;
 
@@ -113,8 +120,17 @@ static void paintTip(HDC dc, RECT rc) {
     DeleteObject(b);
     y += 5;
     SelectObject(dc, fNormal);
+    for (auto& [l, r] : gTipLines) {
+        RECT a = {x, y, x + w, y + kTipLine};
+        SetTextColor(dc, C::Fg);
+        DrawTextW(dc, l.c_str(), -1, &a, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+        SetTextColor(dc, r[0] == L'+' ? C::Red : r[0] == L'-' && r.size() > 1 ? C::Green : C::Cyan);  // differences
+        DrawTextW(dc, r.c_str(), -1, &a, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+        y += kTipLine;
+    }
     for (auto& r : gTipRows) {
-        RECT a = {x, y, x + 70, y + kTipLine}, c = {x + 70, y, x + 150, y + kTipLine}, d = {x + 150, y, x + w, y + kTipLine};
+        RECT a = {x, y, x + 70, y + kTipLine}, c = {x + 70, y, x + 150, y + kTipLine},
+             d = {x + 150, y, x + w, y + kTipLine};
         SetTextColor(dc, C::Pink);
         DrawTextW(dc, (L"Lvl " + std::to_wstring(r.lvl)).c_str(), -1, &a, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
         SetTextColor(dc, C::Fg);
@@ -155,8 +171,32 @@ void hideTip() {
     gTipKey.clear();
 }
 
+static void placeTip(int rows);
+
 static void showTip(const std::wstring& key, const std::wstring& title, const std::string& areaId) {
     if (key == gTipKey && hTip && IsWindowVisible(hTip)) return;
+    gTipKey = key;
+    gTipTitle = title;
+    gTipLines.clear();
+    gTipRows = levelBreakdown(areaId);
+    if (gTipRows.empty()) return hideTip();
+    placeTip((int)gTipRows.size());
+}
+
+// A tip with plain lines (Campaign -> Summary: the zones of an act and their times).
+void showListTip(const std::wstring& key, const std::wstring& title,
+                 const std::vector<std::pair<std::wstring, std::wstring>>& lines) {
+    if (key == gTipKey && hTip && IsWindowVisible(hTip)) return;
+    gTipKey = key;
+    gTipTitle = title;
+    gTipRows.clear();
+    gTipLines = lines;
+    if (gTipLines.empty()) return hideTip();
+    placeTip((int)gTipLines.size());
+}
+
+// Next to the cursor (above it when there is no room below), made first time.
+static void placeTip(int rows) {
     if (!hTip) {
         WNDCLASSEXW wc = {};
         wc.cbSize = sizeof wc;
@@ -165,14 +205,10 @@ static void showTip(const std::wstring& key, const std::wstring& title, const st
         wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
         wc.lpszClassName = L"Poe2MapStatTip";
         RegisterClassExW(&wc);
-        hTip = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, wc.lpszClassName, L"", WS_POPUP, 0, 0,
-                               10, 10, hMain, nullptr, wc.hInstance, nullptr);
+        hTip = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, wc.lpszClassName, L"", WS_POPUP, 0,
+                               0, 10, 10, hMain, nullptr, wc.hInstance, nullptr);
     }
-    gTipKey = key;
-    gTipTitle = title;
-    gTipRows = levelBreakdown(areaId);
-    if (gTipRows.empty()) return hideTip();
-    int w = 320, hgt = 2 * kTipPad + kTipLine + 9 + (int)gTipRows.size() * kTipLine;
+    int w = 320, hgt = 2 * kTipPad + kTipLine + 9 + rows * kTipLine;
     POINT pt;
     GetCursorPos(&pt);
     MONITORINFO mi = {};

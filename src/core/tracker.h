@@ -119,7 +119,7 @@ public:
     static constexpr uint32_t kResumeWindowMs = 60 * 60 * 1000;
     void expireZones(uint32_t nowTick);
 
-    // "Reset Campaign Run" / start after a stop: a clean run from zero. A campaign zone the player is in
+    // "Save and Clear" / start after a stop: a clean run from zero. A campaign zone the player is in
     // right now becomes its first row.
     std::string campaignStartTime;  // wall clock of the reset (or first zone)
     void resetCampaign(uint32_t tick, const std::string& time);

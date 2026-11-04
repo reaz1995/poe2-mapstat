@@ -79,6 +79,8 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             return TRUE;
         case WM_NOTIFY: {
             NMHDR* nh = (NMHDR*)lp;
+            if (nh->hwndFrom == hCmpRunList) return campaignRunsNotify(nh);
+            if (nh->hwndFrom == hCmpCmpList) return campaignCompareNotify(nh);
             bool isList = nh->hwndFrom == hHist || nh->hwndFrom == hSumList || nh->hwndFrom == hCmpList ||
                           nh->hwndFrom == hCmpActList;
             if (nh->code == NM_CUSTOMDRAW && isList) return listCustomDraw((NMLVCUSTOMDRAW*)lp);
@@ -174,7 +176,13 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     setLevelMode(LOWORD(wp) == ID_LVL_MAPS);
                     break;
                 case ID_TAB_CMP:
+                    showCampaignPage();
+                    break;
+                case ID_TAB_CSES:
                     showPage(PG_CAMPAIGN);
+                    break;
+                case ID_TAB_CRUNS:
+                    showPage(PG_CMP_RUNS);
                     break;
                 case ID_TAB_EXP:
                     showPage(PG_EXPERIENCE);
@@ -188,6 +196,20 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 case ID_STEPS_OV:
                     showStepsOverlay(!gStepsOn);
                     WritePrivateProfileStringW(L"StepsOverlay", L"On", gStepsOn ? L"1" : L"0", iniPath().c_str());
+                    break;
+                case ID_RUNS_LOAD:  // Campaign -> Summary: times with or without the loading screens
+                    gRunsLoad = !gRunsLoad;
+                    WritePrivateProfileStringW(L"CampaignRuns", L"WithLoading", gRunsLoad ? L"1" : L"0", iniPath().c_str());
+                    InvalidateRect(hRunsLoadChk, nullptr, FALSE);
+                    refreshCampaignRuns();
+                    break;
+                case ID_OV_COMPARE:
+                    gOvCompare = !gOvCompare;
+                    WritePrivateProfileStringW(L"MapTimerOverlay", L"CompareBest", gOvCompare ? L"1" : L"0",
+                                               iniPath().c_str());
+                    InvalidateRect(hCmpBestChk, nullptr, FALSE);
+                    ovSyncFooter();  // the previous act's line comes or goes
+                    if (hOverlay) InvalidateRect(hOverlay, nullptr, FALSE);
                     break;
                 case ID_ZONES_IMPORT:
                     importAreaTables();
@@ -257,12 +279,6 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 case ID_RESTORE_GEN:
                     restoreSession(gMapFile);
                     break;
-                case ID_RESTORE_CMP:
-                    restoreSession(gCmpFile);
-                    break;
-                case ID_CMP_RESET:
-                    resetCampaignRun();
-                    break;
                 case ID_GEN_RESET:
                     resetGeneralSession();
                     break;
@@ -274,6 +290,15 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     break;
                 case ID_EXP_SUM:
                     exportListView(hSumList, exportName(L"summary").c_str());
+                    break;
+                case ID_RUNS_IMPORT:
+                    importCampaignRun();
+                    break;
+                case ID_EXP_RUNS:
+                    exportListView(hCmpRunList, exportName(L"campaign-runs").c_str());
+                    break;
+                case ID_EXP_RUNCMP:
+                    exportListView(hCmpCmpList, exportName(L"campaign-comparison").c_str());
                     break;
                 case ID_EXP_CMP:
                 {  // only the pill shown: Campaign (whole run), one act, or Summary; the file is named after it
@@ -319,12 +344,6 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     showOverlay(!gOverlayOn);
                     ovIniSet(L"On", gOverlayOn ? 1 : 0);
                     break;
-                case ID_CMP_STOP:
-                    campaignAction(g.cmpClock == Tracker::Clock::Stopped ? HK_START : HK_STOP);
-                    break;
-                case ID_CMP_PAUSE:
-                    campaignAction(HK_PAUSE);
-                    break;
                 case ID_ONTOP:
                     setOnTop(!gOnTopOn);
                     WritePrivateProfileStringW(L"main", L"OnTop", gOnTopOn ? L"1" : L"0", iniPath().c_str());
@@ -355,7 +374,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     break;
             }
             return 0;
-        case WM_CONTEXTMENU:  // right-click on a hotkey button: Remove; on the campaign timer: Generate Summary
+        case WM_CONTEXTMENU:  // right-click on a hotkey button: Remove; on the campaign timer: its menu
             if (gPage == PG_CAMPAIGN) {
                 POINT pt;
                 GetCursorPos(&pt);

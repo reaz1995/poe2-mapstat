@@ -225,16 +225,19 @@ static void placeSearchBox(HWND lv, HWND hd, HDC dc) {
 
 static LRESULT CALLBACK ListProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR) {
     if (msg == WM_SAVE_ORDER) {
-        saveColumnOrder(h);
+        if (h == hCmpRunList || h == hCmpCmpList) campaignRunsSaveOrder(h);  // by column name (acts come and go)
+        else saveColumnOrder(h);
         return 0;
     }
-    if (h == hSumList) {
-        if (msg == WM_MOUSEMOVE) summaryHover(h, lp);
+    if (h == hSumList || h == hCmpRunList || h == hCmpCmpList) {
+        if (msg == WM_MOUSEMOVE) h == hSumList ? summaryHover(h, lp) : campaignRunsHover(h, lp);
         else if (msg == WM_MOUSELEAVE || msg == WM_MOUSEWHEEL || msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN)
             hideTip();
     }
     if (msg == WM_NOTIFY) {
         NMHDR* nh = (NMHDR*)lp;
+        bool runs = h == hCmpRunList || h == hCmpCmpList;  // columns per act: moved by dragging only
+        if (nh->hwndFrom == ListView_GetHeader(h) && nh->code == NM_RCLICK && runs) return TRUE;
         if (nh->hwndFrom == ListView_GetHeader(h) && nh->code == NM_RCLICK) {
             HDHITTESTINFO ht = {};
             GetCursorPos(&ht.pt);

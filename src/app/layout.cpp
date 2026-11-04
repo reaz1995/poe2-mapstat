@@ -7,7 +7,37 @@ static HWND hExpCap[6];  // captions above the Experience inputs
 static HWND hExpModsLbl;  // "TABLETS / MAP MODS" section title
 
 // Maps tab has two sub-pages (Session, Summary); the tab opens the one that was shown last.
-static int gMapsPage = PG_GENERAL;
+static int gMapsPage = PG_GENERAL, gCmpPage = PG_CAMPAIGN;
+HWND hRunsLoadChk = nullptr;
+bool gRunsLoad = false;
+HWND hCmpSubSession = nullptr, hCmpSubRuns = nullptr, hCmpRunList = nullptr, hLblRuns = nullptr, hCmpCmpList = nullptr,
+     hLblCmpCmp = nullptr, hExpRuns = nullptr, hExpRunCmp = nullptr, hRunsImport = nullptr;
+
+// Campaign -> Summary: hovering a list's title shows how to use the list.
+static WNDPROC gHdrTipOld;
+static LRESULT CALLBACK HdrTipProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
+    if (msg == WM_MOUSEMOVE) {
+        TRACKMOUSEEVENT tme = {sizeof tme, TME_LEAVE, h, 0};
+        TrackMouseEvent(&tme);
+        if (h == hLblRuns)
+            showListTip(L"hdr-runs", L"Saved runs",
+                        {{L"Ctrl + click: add to the comparison", L""},
+                         {L"Double-click: load the run", L""},
+                         {L"Right-click: pin, rename or remove", L""},
+                         {L"Hover an act: its zones", L""}});
+        else
+            showListTip(L"hdr-cmp", L"Comparison",
+                        {{L"The first selected run is the base", L""},
+                         {L"The others: faster (-) or slower (+)", L""},
+                         {L"Hover an act: each zone's difference", L""}});
+    } else if (msg == WM_MOUSELEAVE) hideTip();
+    else if (msg == WM_SETCURSOR) {  // the help cursor hints there is something to read
+        SetCursor(LoadCursor(nullptr, IDC_HELP));
+        return TRUE;
+    }
+    return CallWindowProcW(gHdrTipOld, h, msg, wp, lp);
+}
+void showCampaignPage() { showPage(gCmpPage); }
 
 void showMapsPage() { showPage(gMapsPage); }
 
@@ -33,8 +63,13 @@ void setOptPill(int i) {
 
 void showPage(int p) {
     gPage = p;
-    bool maps = p == PG_GENERAL || p == PG_SUMMARY;
+    bool maps = p == PG_GENERAL || p == PG_SUMMARY, cmp = p == PG_CAMPAIGN || p == PG_CMP_RUNS;
     if (maps) gMapsPage = p;
+    if (cmp) gCmpPage = p;
+    for (HWND h : {hCmpSubSession, hCmpSubRuns}) {
+        ShowWindow(h, cmp ? SW_SHOW : SW_HIDE);
+        InvalidateRect(h, nullptr, FALSE);
+    }
     for (int i = 0; i < PG_COUNT; ++i)
         for (HWND h : gPages[i]) ShowWindow(h, i == p ? SW_SHOW : SW_HIDE);
     for (HWND h : {hSubSession, hSubSummary}) {
@@ -48,6 +83,7 @@ void showPage(int p) {
     InvalidateRect(hMain, nullptr, TRUE);
     if (p == PG_SUMMARY) refreshSummary();
     if (p == PG_CAMPAIGN) refreshCampaign(true);
+    if (p == PG_CMP_RUNS) refreshCampaignRuns();
     campaignShowLists();
     applyOptPill();
 }
@@ -103,26 +139,42 @@ void layout(int w, int h) {
         place(hSumList, L + 6, sy + 6, CW - 12, B - sy - 12);
     }
 
-    // ---- Campaign
+    // ---- Campaign: Session / Summary pills on top, the Session page under them
+    place(hCmpSubSession, L, T, 100, 30);
+    place(hCmpSubRuns, L + 108, T, 106, 30);
+    place(hRunsLoadChk, L, T + 40, 260, 26);
+    place(hLblRuns, L, T + 76, 110, 18);
+    place(hRunsImport, R - 290, T + 68, 152, 30);
+    place(hExpRuns, R - 130, T + 68, 130, 30);  // right of the label, over the runs list
+    {  // the saved runs on top, the comparison of the selected ones under them
+        int ry = T + 102, rh2 = (B - ry - 34) * 55 / 100, cy = ry + rh2 + 34;
+        card(PG_CMP_RUNS, L, ry, CW, rh2);
+        place(hCmpRunList, L + 6, ry + 6, CW - 12, rh2 - 12);
+        place(hLblCmpCmp, L, ry + rh2 + 10, 110, 18);
+        place(hExpRunCmp, R - 130, ry + rh2 + 2, 130, 30);
+        card(PG_CMP_RUNS, L, cy, CW, B - cy);
+        place(hCmpCmpList, L + 6, cy + 6, CW - 12, B - cy - 12);
+    }
+    {
+    const int T = kTabBarH + 14 + 44;  // the Session page starts under the pills
     place(hCmpTitle, L, T, CW - 260, 40);
     place(hCmpTimer, R - 250, T - 6, 250, 72);
     place(hCmpTimerLoad, R - 250, T + 62, 250, 20);  // under the timer
     place(hCmpStatus, L, T + 42, CW - 260, 22);
-    place(hCmpReset, L, T + 80, 180, rh);
-    place(hExpCmp, L + 188, T + 80, 130, rh);
-    place(hRestoreCmp, L + 326, T + 80, 230, rh);
-    place(hCmpPause, R - 206, T + 92, 100, rh);
-    place(hCmpStop, R - 100, T + 92, 100, rh);
+    // "ZONES" (or "ACTS" on the Act Summary pill) over the pills, the totals under them; pause / stop are in the
+    // timer's right-click menu
+    place(hLblCmp, L, T + 84, 200, 18);
     gActRowX = L;
-    gActRowY = T + 80 + rh + 14;
+    gActRowY = T + 108;
     placeActs();
-    place(hLblCmp, L, gActRowY + 44, 70, 18);
-    place(hCmpSum, L + 75, gActRowY + 42, CW - 75, 22);
+    place(hCmpSum, L, gActRowY + 42, CW - 140, 22);
+    place(hExpCmp, R - 130, gActRowY + 37, 130, rh);  // under the pills: exports the pill chosen
     {
         int cy = gActRowY + 70;
         card(PG_CAMPAIGN, L, cy, CW, B - cy);
         place(hCmpList, L + 6, cy + 6, CW - 12, B - cy - 12);
         place(hCmpActList, L + 6, cy + 6, CW - 12, B - cy - 12);
+    }
     }
 
     // ---- Layouts
@@ -216,7 +268,8 @@ void layout(int w, int h) {
     place(hRecMinus, ox + 114, y - 3, 34, rh);
     place(hRecVal, ox + 152, y + 4, 34, 20);
     place(hRecPlus, ox + 190, y - 3, 34, rh);
-    place(hExpOvChk, ox + 250, y, CW - (ox + 250 - L), 26);
+    place(hExpOvChk, ox + 250, y, 190, 26);     // the timer overlay's add-ons: experience lines,
+    place(hCmpBestChk, ox + 450, y, 230, 26);   // comparison with the pinned / best run
     y += 40;
     place(hCmdChk, L, y, 240, 26);
     y += 40;
@@ -266,6 +319,30 @@ void createControls() {
 
     // tab bar
     hTabGen = btn(L"Maps", ID_TAB_GEN, -1, Btn::Tab);
+    hRunsLoadChk = btn(L"Include loading time", ID_RUNS_LOAD, PG_CMP_RUNS, Btn::Check);
+    hExpRuns = btn(L"Export to CSV", ID_EXP_RUNS, PG_CMP_RUNS, Btn::Accent);
+    hRunsImport = btn(L"Import from file...", ID_RUNS_IMPORT, PG_CMP_RUNS, Btn::Normal);
+    hExpRunCmp = btn(L"Export to CSV", ID_EXP_RUNCMP, PG_CMP_RUNS, Btn::Accent);
+    gRunsLoad = GetPrivateProfileIntW(L"CampaignRuns", L"WithLoading", 0, iniPath().c_str()) != 0;
+    hCmpSubSession = btn(L"Session", ID_TAB_CSES, -1, Btn::Pill);
+    hCmpSubRuns = btn(L"Summary", ID_TAB_CRUNS, -1, Btn::Pill);
+    hLblRuns = label(L"SAVED RUNS", ID_LBL_CMP, fSection, PG_CMP_RUNS, false, SS_NOTIFY);
+    hLblCmpCmp = label(L"COMPARISON", ID_LBL_CMP, fSection, PG_CMP_RUNS, false, SS_NOTIFY);
+    for (HWND h : {hLblRuns, hLblCmpCmp})  // how to use the list shows when hovering its title
+        gHdrTipOld = (WNDPROC)SetWindowLongPtrW(h, GWLP_WNDPROC, (LONG_PTR)HdrTipProc);
+    {
+        const wchar_t* cc2[] = {L"Run", L"Campaign"};
+        const int cw2[] = {220, 110};
+        hCmpCmpList = list(ID_CMP_CMPLIST, PG_CMP_RUNS, cc2, cw2, 2, 0b10);
+    }
+    {
+        const wchar_t* rc[] = {L"Run", L"Campaign"};
+        const int rw[] = {220, 110};
+        hCmpRunList = list(ID_CMP_RUNLIST, PG_CMP_RUNS, rc, rw, 2, 0b10);
+        // names can be edited (Rename), several runs selected (Ctrl + click) for the comparison
+        SetWindowLongPtrW(hCmpRunList, GWL_STYLE,
+                          (GetWindowLongPtrW(hCmpRunList, GWL_STYLE) | LVS_EDITLABELS) & ~(LONG_PTR)LVS_SINGLESEL);
+    }
     hSubSession = btn(L"Session", ID_TAB_SES, -1, Btn::Pill);
     hSubSummary = btn(L"Summary", ID_TAB_SUM, -1, Btn::Pill);
     hTabCmp = btn(L"Campaign", ID_TAB_CMP, -1, Btn::Tab);
@@ -303,10 +380,7 @@ void createControls() {
     hCmpTitle = label(L"", ID_CMP_TITLE, fTitle, PG_CAMPAIGN, false, SS_ENDELLIPSIS);
     hCmpTimer = mk(L"STATIC", L"00:00", SS_RIGHT, ID_CMP_TIMER, fTimer, PG_CAMPAIGN);
     hCmpStatus = label(L"", ID_CMP_STATUS, fBold, PG_CAMPAIGN);
-    hCmpReset = btn(L"Reset Campaign Run", ID_CMP_RESET, PG_CAMPAIGN, Btn::Danger);
     hCmpTimerLoad = mk(L"STATIC", L"", SS_RIGHT | SS_NOPREFIX, ID_CMP_TIMER_LOAD, fNormal, PG_CAMPAIGN);
-    hCmpPause = btn(L"Pause", ID_CMP_PAUSE, PG_CAMPAIGN, Btn::Normal);
-    hCmpStop = btn(L"Stop", ID_CMP_STOP, PG_CAMPAIGN, Btn::Danger);
     hExpCmp = btn(L"Export to CSV", ID_EXP_CMP, PG_CAMPAIGN, Btn::Accent);
     hLblCmp = label(L"ZONES", ID_LBL_CMP, fSection, PG_CAMPAIGN);
     hCmpSum = label(L"", ID_CMP_SUM, fBold, PG_CAMPAIGN, false, SS_ENDELLIPSIS);
@@ -378,8 +452,7 @@ void createControls() {
         L"Experience gain\r\nExpected exp\r\nBest area\r\nLast level up\r\nTime between level ups\r\nExp per hour",
         ID_EXP_ROWLBL, fNormal, PG_EXPERIENCE, true);
     hExpInfo = label(L"", ID_EXP_INFO, fNormal, PG_EXPERIENCE, true);
-    hExpOvChk = btn(L"Experience lines (area level, exp bonus, required exp, exp/h)", ID_EXP_OVCHK, PG_OPTIONS,
-                    Btn::Check);  // Options -> Overlays, MapTimerOverlay row
+    hExpOvChk = btn(L"Experience AddOn", ID_EXP_OVCHK, PG_OPTIONS, Btn::Check);  // Options -> Overlays, MapTimerOverlay row
     {
         const wchar_t* lc[] = {L"#",          L"Zone",        L"Area Lvl",   L"Lvl before",
                                L"Lvl after",  L"Time to lvl", L"Exp/h",      L"Leveled at"};
@@ -420,7 +493,6 @@ void createControls() {
 #endif
     hLoadHist = btn(L"Load past Map session events...", ID_LOAD_HIST, PG_GENERAL, Btn::Accent);
     hRestoreGen = btn(L"Restore map session...", ID_RESTORE_GEN, PG_GENERAL, Btn::Normal);
-    hRestoreCmp = btn(L"Restore campaign session...", ID_RESTORE_CMP, PG_CAMPAIGN, Btn::Normal);
     hOptLbl =
         label(L"Status\r\nRead\r\nLog session\r\nCurrent area\r\nMap session\r\nCampaign session\r\nSummary session",
               ID_OPT_LBL, fNormal, PG_OPTIONS, true);
@@ -429,13 +501,15 @@ void createControls() {
     createStepsPage();
 
     hNotesChk = btn(L"Show notes", ID_STEPS_NOTES, PG_OPTIONS, Btn::Check);  // StepsOverlay row
+    hCmpBestChk = btn(L"Time Comparison AddOn", ID_OV_COMPARE, PG_OPTIONS, Btn::Check);
+    gOvCompare = GetPrivateProfileIntW(L"MapTimerOverlay", L"CompareBest", 0, iniPath().c_str()) != 0;
     hZonesImport = btn(L"Load zone names...", ID_ZONES_IMPORT, PG_OPTIONS, Btn::Normal);
     {
         const wchar_t* pills[3] = {L"Overlays", L"Hotkeys", L"Theme"};
         for (int i = 0; i < 3; ++i) hOptPill[i] = btn(pills[i], ID_OPT_PILL0 + i, PG_OPTIONS, Btn::Pill);
         for (HWND h : {hLblOverlay, hOvGeneralLbl, hAlphaLbl, hAlphaSlider, hAlphaVal, hClickChk, hCaptureChk, hOvEachLbl,
                        hOverlayChk, hRecLbl, hRecMinus, hRecVal, hRecPlus, hCmdChk, hGraphChk, hGraphOnlyChk, hStepsChk,
-                       hStepsLbl, hStepsMinus, hStepsVal, hStepsPlus, hNotesChk, hExpOvChk})
+                       hStepsLbl, hStepsMinus, hStepsVal, hStepsPlus, hNotesChk, hExpOvChk, hCmpBestChk})
             gOptGroup[h] = 0;
         gOptGroup[hLblKeys] = 1;
         gOptGroup[hLayCropChk] = 1;

@@ -5,7 +5,11 @@
 struct OvLine {
     std::wstring lvl, name, time;
     std::wstring range = L"";  // "54-64" for zones that follow the character level, shown small after the level
+    std::wstring cmp = L"";    // "(+5s)": against the best run (campaign zones, Options), left of the time
 };
+
+bool gOvCompare = false;
+HWND hCmpBestChk = nullptr;
 
 static int ovHeight(double sc, int n);
 static void overlayData(OvLine& head, std::vector<OvLine>& last, COLORREF& timeCol);
@@ -41,6 +45,7 @@ void ovIniSet(const wchar_t* key, int v) {
 static const int kOvFoot = 9 + 19;  // separator + one line
 
 static bool gOvFoot = false;
+static bool gOvFootPrev = false;  // with Compare zone times: the previous act's line above the current one
 
 // Two experience lines under the header (Experience tab): the current area level (it moves here from the header) with
 // the character level, and the best area level to level up in. Both with the experience compared to a monster of the
@@ -50,7 +55,7 @@ static bool gOvExp = false;
 
 static int ovHeight(double sc, int n) {
     return (
-        int)((kOvPad * 2 + kOvHead + (gOvExp ? (gOvFoot ? 4 : 3) * kOvExp : 0) + (n ? 9 + n * kOvLine : 0) + (gOvFoot ? kOvFoot : 0)) *
+        int)((kOvPad * 2 + kOvHead + (gOvExp ? (gOvFoot ? 4 : 3) * kOvExp : 0) + (n ? 9 + n * kOvLine : 0) + (gOvFoot ? kOvFoot : 0) + (gOvFootPrev ? kOvLine : 0)) *
                  sc +
              0.5);
 }
@@ -86,6 +91,7 @@ static void overlayDataNow(OvLine& head, std::vector<OvLine>& last, COLORREF& ti
             const Zone& z = g.zones[g.curZone];
             head = {std::to_wstring(z.level), areaName(z.name, z.areaId), W(fmtDuration(z.activeAt(now))),
                     W(g.levelRange(z.areaId))};
+            if (gOvCompare && !z.town) head.cmp = zoneVsBest(z.areaId, now);
             timeCol = g.cmpClock == Tracker::Clock::Paused ? C::Yellow : z.inSegment ? C::Purple : C::Cyan;
         }
         std::vector<int> idx;
@@ -158,6 +164,16 @@ static void paintOverlay(HDC dc, RECT rc) {
         DrawTextW(dc, l.time.c_str(), -1, &t, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
         SIZE ts, ls;
         GetTextExtentPoint32W(dc, l.time.c_str(), (int)l.time.size(), &ts);
+        if (!l.cmp.empty()) {  // "(+5s)" left of the time: green under the best, red over it
+            SelectObject(dc, fOvSmall);
+            SIZE cs;
+            GetTextExtentPoint32W(dc, l.cmp.c_str(), (int)l.cmp.size(), &cs);
+            RECT c = {P, y, rc.right - P - ts.cx - (int)(6 * S), y + h};
+            SetTextColor(dc, l.cmp[1] == L'-' ? C::Green : C::Red);
+            DrawTextW(dc, l.cmp.c_str(), -1, &c, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+            ts.cx += cs.cx + (int)(6 * S);  // the name ends before both
+            SelectObject(dc, f);
+        }
         GetTextExtentPoint32W(dc, L"00", 2, &ls);
         RECT lv = {P, y, P + ls.cx + 2, y + h};
         SetTextColor(dc, lvlCol);
@@ -331,8 +347,24 @@ static void paintOverlay(HDC dc, RECT rc) {
     FillRect(dc, &sep2, b);
     DeleteObject(b);
     y += (int)(5 * S);
-    // One line: "Act 1: 01:08" on the left, "Campaign: 07:43" on the right
     SelectObject(dc, fOvSmall);
+    std::wstring pName, pTime, pCmp;
+    if (gOvFootPrev && previousAct(now, pName, pTime, pCmp)) {  // "Act 1: 15:12 (+3m15s)": the act just finished
+        std::wstring lp = pName + L": ";
+        SIZE a, t;
+        GetTextExtentPoint32W(dc, lp.c_str(), (int)lp.size(), &a);
+        GetTextExtentPoint32W(dc, pTime.c_str(), (int)pTime.size(), &t);
+        SetTextColor(dc, C::Comment);
+        TextOutW(dc, P, y + (LH - a.cy) / 2, lp.c_str(), (int)lp.size());
+        SetTextColor(dc, C::Fg);
+        TextOutW(dc, P + a.cx, y + (LH - a.cy) / 2, pTime.c_str(), (int)pTime.size());
+        if (!pCmp.empty()) {
+            SetTextColor(dc, pCmp[1] == L'-' ? C::Green : C::Red);
+            TextOutW(dc, P + a.cx + t.cx + (int)(6 * S), y + (LH - a.cy) / 2, pCmp.c_str(), (int)pCmp.size());
+        }
+        y += LH;
+    }
+    // One line: "Act 1: 01:08" on the left, "Campaign: 07:43" on the right
     std::wstring lA = (act.empty() ? std::wstring(L"Act") : W(act)) + L":", lB = L"Campaign:";
     std::wstring tA = W(fmtDuration(actMs)), tB = W(fmtDuration(totalMs));
     SIZE sp, lb, tb;
@@ -340,8 +372,17 @@ static void paintOverlay(HDC dc, RECT rc) {
     GetTextExtentPoint32W(dc, lA.c_str(), (int)lA.size(), &lb);
     SetTextColor(dc, C::Comment);
     TextOutW(dc, P, y + (LH - lb.cy) / 2, lA.c_str(), (int)lA.size());
-    SetTextColor(dc, clockCol);
+    // with Compare zone times: over the act's time to beat, the act time turns red with "(+1m05s)" after it
+    int64_t actBest = gOvCompare && !act.empty() ? bestActMs(act) : -1;
+    bool over = actBest >= 0 && (int64_t)actMs > actBest;
+    SetTextColor(dc, over ? C::Red : clockCol);
     TextOutW(dc, P + lb.cx + sp.cx, y + (LH - lb.cy) / 2, tA.c_str(), (int)tA.size());
+    if (over) {
+        SIZE ta;
+        GetTextExtentPoint32W(dc, tA.c_str(), (int)tA.size(), &ta);
+        std::wstring d = diffInParens((int64_t)actMs - actBest);
+        TextOutW(dc, P + lb.cx + sp.cx + ta.cx + (int)(6 * S), y + (LH - lb.cy) / 2, d.c_str(), (int)d.size());
+    }
     GetTextExtentPoint32W(dc, tB.c_str(), (int)tB.size(), &tb);
     GetTextExtentPoint32W(dc, lB.c_str(), (int)lB.size(), &lb);
     int xr = rc.right - P - tb.cx;
@@ -411,7 +452,10 @@ bool ovCampaignShown() { return gOvFoot; }
 void ovSyncFooter() {
     bool want = g.curZone >= 0 || (g.cmpClock == Tracker::Clock::Stopped && Tracker::isCampaign(g.location));
     bool exp = gExpOnOverlay && gExpLevel > 0 && !expNoMonsters();
-    if (want == gOvFoot && exp == gOvExp) return;
+    std::wstring n, t, c;
+    bool prev = want && gOvCompare && previousAct(nowTick(), n, t, c);
+    if (want == gOvFoot && exp == gOvExp && prev == gOvFootPrev) return;
+    gOvFootPrev = prev;
     gOvFoot = want;
     gOvExp = exp;
     ovFitHeight();
