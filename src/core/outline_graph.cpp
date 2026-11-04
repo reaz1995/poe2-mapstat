@@ -141,9 +141,10 @@ const int* orientOf(int o) { return kOrient[o]; }
 
 }  // namespace
 
-Graph pointsGraph(const std::vector<Outline>& outlines) {
+Graph pointsGraph(const std::vector<Outline>& outlines, double minFit) {
     Graph g;
     g.runs = (int)outlines.size();
+    g.fits.assign(outlines.size(), -1);
     std::vector<std::vector<Mark>> marks(outlines.size());
     for (size_t r = 0; r < outlines.size(); ++r) {
         Outside out = outside(outlines[r].img);
@@ -471,10 +472,12 @@ Graph pointsGraph(const std::vector<Outline>& outlines) {
             }
         }
     }
+    for (const Place& p : best.placed) g.fits[p.run] = p.fit;
     // a run whose map hardly lies on the reference's in any way is another layout: left out
     best.placed.erase(std::remove_if(best.placed.begin(), best.placed.end(),
-                                     [&](const Place& p) { return p.run != best.ref && p.fit < 0.3; }),
+                                     [&](const Place& p) { return p.run != best.ref && p.fit < minFit; }),
                       best.placed.end());
+    for (const Place& p : best.placed) g.usedRuns.push_back(p.run);
     const int ref = best.ref;
     std::vector<Place>& placed = best.placed;
     g.used = (int)placed.size();
@@ -727,6 +730,161 @@ Graph pointsGraph(const std::vector<Outline>& outlines) {
         g.texts.push_back({16 + lw + 14, ly - 20, legend[i].text});
     }
     return g;
+}
+
+}  // namespace outline
+
+namespace outline {
+
+namespace {
+
+// The ground inside a map's outer walls, on a square grid of 16 px cells (the overlay's squash undone), centred on
+// its middle. Small bits (text, lit twigs) are left out; gaps in the walls up to ~16 px are closed first.
+const int kShapeN = 200;
+using Shape = std::vector<uint8_t>;
+
+Shape mapShape(const Image& im) {
+    const int C = 8, G = 16, N = kShapeN;
+    const double k = 0.82;
+    int cw = (im.w + C - 1) / C, ch = (im.h + C - 1) / C;
+    std::vector<uint8_t> cell((size_t)cw * ch, 0);
+    for (int y = 0; y < im.h; ++y)
+        for (int x = 0; x < im.w; ++x) {
+            const uint8_t* p = &im.px[((size_t)y * im.w + x) * 3];
+            int mx = std::max({p[0], p[1], p[2]}), mn = std::min({p[0], p[1], p[2]});
+            if (mn > 150 && mx - mn < 60) cell[(y / C) * cw + x / C] = 1;
+        }
+    size_t largest = 0;
+    std::vector<std::pair<std::vector<int>, size_t>> comps;
+    components(cell, cw, ch, [&](const std::vector<int>& comp, const Box&) {
+        largest = std::max(largest, comp.size());
+        comps.push_back({comp, comp.size()});
+    });
+    std::fill(cell.begin(), cell.end(), 0);
+    for (auto& c : comps)
+        if (c.second >= std::max<size_t>(30, largest / 20))
+            for (int i : c.first) cell[i] = 1;
+    // walls made 2 cells thicker, then the outside: what is reached from the border
+    int W = cw + 2, H = ch + 2;
+    std::vector<uint8_t> wall((size_t)W * H, 0), out((size_t)W * H, 0);
+    for (int y = 0; y < ch; ++y)
+        for (int x = 0; x < cw; ++x)
+            if (cell[y * cw + x])
+                for (int dy = -2; dy <= 2; ++dy)
+                    for (int dx = -2; dx <= 2; ++dx) wall[(size_t)(y + 1 + dy) * W + x + 1 + dx] = 1;
+    std::vector<int> q = {0};
+    out[0] = 1;
+    for (size_t i = 0; i < q.size(); ++i) {
+        int x = q[i] % W, y = q[i] / W;
+        for (auto [dx, dy] : {std::pair{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+            int X = x + dx, Y = y + dy;
+            if (X < 0 || Y < 0 || X >= W || Y >= H || out[(size_t)Y * W + X] || wall[(size_t)Y * W + X]) continue;
+            out[(size_t)Y * W + X] = 1, q.push_back(Y * W + X);
+        }
+    }
+    double sx = 0, sy = 0;
+    long n = 0;
+    for (int y = 0; y < ch; ++y)
+        for (int x = 0; x < cw; ++x)
+            if (!out[(size_t)(y + 1) * W + x + 1]) sx += x * C, sy += y * C / k, ++n;
+    Shape s((size_t)N * N, 0);
+    if (!n) return s;
+    sx /= n, sy /= n;
+    for (int y = 0; y < ch; ++y)
+        for (int x = 0; x < cw; ++x)
+            if (!out[(size_t)(y + 1) * W + x + 1]) {
+                int gx = (int)((x * C - sx) / G + N / 2), gy = (int)((y * C / k - sy) / G + N / 2);
+                if (gx >= 0 && gy >= 0 && gx < N && gy < N) s[(size_t)gy * N + gx] = 1;
+            }
+    return s;
+}
+
+// The 8 ways to turn / mirror a shape, each centred again.
+std::vector<Shape> turns(const Shape& s) {
+    const int N = kShapeN;
+    std::vector<Shape> r;
+    for (int o = 0; o < 8; ++o) {
+        Shape t((size_t)N * N, 0);
+        double mx = 0, my = 0;
+        long n = 0;
+        for (int y = 0; y < N; ++y)
+            for (int x = 0; x < N; ++x) {
+                if (!s[(size_t)y * N + x]) continue;
+                int X = x, Y = y;
+                if (o & 4) X = N - 1 - X;  // mirrored
+                for (int k = 0; k < (o & 3); ++k) std::tie(X, Y) = std::pair{N - 1 - Y, X};  // turned 90
+                t[(size_t)Y * N + X] = 1, mx += X, my += Y, ++n;
+            }
+        if (!n) {
+            r.push_back(t);
+            continue;
+        }
+        int ox = (int)std::lround(N / 2 - mx / n), oy = (int)std::lround(N / 2 - my / n);
+        Shape c((size_t)N * N, 0);
+        for (int y = 0; y < N; ++y)
+            for (int x = 0; x < N; ++x)
+                if (t[(size_t)y * N + x] && x + ox >= 0 && y + oy >= 0 && x + ox < N && y + oy < N)
+                    c[(size_t)(y + oy) * N + x + ox] = 1;
+        r.push_back(std::move(c));
+    }
+    return r;
+}
+
+// How much two shapes overlap (shared / either), best over the turns of b and small shifts.
+double sameShape(const Shape& a, const std::vector<Shape>& bTurns) {
+    const int N = kShapeN;
+    double best = 0;
+    for (const Shape& b : bTurns)
+        for (int dy = -4; dy <= 4; dy += 2)
+            for (int dx = -4; dx <= 4; dx += 2) {
+                long both = 0, either = 0;
+                for (int y = 0; y < N; ++y) {
+                    int Y = y - dy;
+                    for (int x = 0; x < N; ++x) {
+                        int X = x - dx;
+                        bool bb = X >= 0 && Y >= 0 && X < N && Y < N && b[(size_t)Y * N + X];
+                        bool aa = a[(size_t)y * N + x];
+                        both += aa && bb, either += aa || bb;
+                    }
+                }
+                if (either) best = std::max(best, (double)both / either);
+            }
+    return best;
+}
+
+}  // namespace
+
+std::vector<std::vector<int>> layoutFamilies(const std::vector<Outline>& outlines, double minSame) {
+    int n = (int)outlines.size();
+    std::vector<Shape> shapes;
+    for (auto& o : outlines) shapes.push_back(mapShape(o.img));
+    std::vector<std::vector<double>> same(n, std::vector<double>(n, 1));
+    for (int j = 0; j < n; ++j) {
+        auto t = turns(shapes[j]);
+        for (int i = 0; i < j; ++i) same[i][j] = same[j][i] = sameShape(shapes[i], t);
+    }
+    // joined while the two groups are alike on average (average linkage): a layout in between does not chain
+    // two different ones together
+    std::vector<std::vector<int>> groups;
+    for (int i = 0; i < n; ++i) groups.push_back({i});
+    for (;;) {
+        double best = -1;
+        int ba = -1, bb = -1;
+        for (size_t a = 0; a < groups.size(); ++a)
+            for (size_t b = a + 1; b < groups.size(); ++b) {
+                double s = 0;
+                for (int i : groups[a])
+                    for (int j : groups[b]) s += same[i][j];
+                s /= (double)(groups[a].size() * groups[b].size());
+                if (s > best) best = s, ba = (int)a, bb = (int)b;
+            }
+        if (ba < 0 || best < minSame) break;
+        groups[ba].insert(groups[ba].end(), groups[bb].begin(), groups[bb].end());
+        groups.erase(groups.begin() + bb);
+    }
+    for (auto& g : groups) std::sort(g.begin(), g.end());
+    std::stable_sort(groups.begin(), groups.end(), [](auto& a, auto& b) { return a.size() > b.size(); });
+    return groups;
 }
 
 }  // namespace outline

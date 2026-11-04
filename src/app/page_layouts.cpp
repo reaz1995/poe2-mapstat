@@ -1363,18 +1363,34 @@ void makeLayoutGraph() {
                 outs.push_back(std::move(o));
             }
         }
-        outline::Graph gr = outline::pointsGraph(outs);
-        auto* r = new ShotDone{L"", zone, gi, true, gr.used, (int)outs.size(), {}, 0, {}};
-        if (!gr.img.empty()) {
+        // A zone is made from a few base layouts: one graph per base with 2+ runs ("graph.png", "graph_1.png" ...;
+        // the graphs made before are replaced). A run whose base no other run has yet gets none.
+        auto* r = new ShotDone{L"", zone, gi, true, 0, (int)outs.size(), {}, 0, {}};
+        std::vector<std::wstring> made;
+        int bases = 0;
+        for (const auto& fam : outline::layoutFamilies(outs)) {
+            if (fam.size() < 2) continue;
+            ++bases;
+            std::vector<outline::Outline> sub;
+            for (int i : fam) sub.push_back(outs[i]);
+            outline::Graph gr = outline::pointsGraph(sub);
+            if (gr.img.empty()) continue;
+            if (made.empty())  // the first graph is there: the old ones go
+                for (auto& f : listDir(dir, false))
+                    if (isGraph(f)) DeleteFileW((dir + L"\\" + f).c_str());
             // caption and legend (how many runs had each point, and whether it stays in one place)
             std::vector<std::pair<std::wstring, POINT>> texts;
-            texts.push_back({std::to_wstring(gr.used) + L" of " + std::to_wstring(outs.size()) +
-                                 L" outlines lined up on the entrances  \u00b7  a dot where each run had the point  \u00b7  "
-                                 L"numbered rings: spots the inner places swap between",
+            texts.push_back({L"Layout " + std::to_wstring(bases) + L": " + std::to_wstring(gr.used) + L" of " +
+                                 std::to_wstring(sub.size()) +
+                                 L" outlines lined up on the entrances  \u00b7  a dot where each run had the point  "
+                                 L"\u00b7  numbered rings: spots the inner places swap between",
                              POINT{16, 12}});
             for (auto& t : gr.texts) texts.push_back({W(t.text), POINT{t.x, t.y}});
-            if (savePng(gr.img, graphPath(dir), &texts)) r->what = L"graph";
+            std::wstring path = graphPath(dir);
+            if (savePng(gr.img, path, &texts)) made.push_back(path), r->used += gr.used;
         }
+        r->seed = (uint32_t)made.size();  // graphs made
+        if (!made.empty()) r->what = L"graph";
         if (!PostMessageW(hMain, WM_LAYOUT_DONE, 0, (LPARAM)r)) delete r;
     }).detach();
 }
@@ -1629,13 +1645,15 @@ void layoutDone(LPARAM lp) {
     if (r->what.empty()) {
         MessageBoxW(hMain,
                     (L"The outlines could not be lined up (" + std::to_wstring(r->runs) +
-                     L" outlines). Each needs at least 2 named points (exits, waypoint) that another outline has "
-                     L"too.")
+                     L" outlines). A graph needs 2 or more outlines of the same base layout, each with at least 2 "
+                     L"named points (exits, waypoint) the others have too.")
                         .c_str(),
                     L"Make graph", MB_ICONINFORMATION);
         return;
     }
-    trayBalloon(L"Layout graph made", std::to_wstring(r->used) + L" of " + std::to_wstring(r->runs) +
+    trayBalloon(r->seed > 1 ? std::to_wstring(r->seed) + L" layout graphs made (one per base layout)"
+                            : std::wstring(L"Layout graph made"),
+                std::to_wstring(r->used) + L" of " + std::to_wstring(r->runs) +
                                           L" outlines lined up  \u00b7  " + r->zone);
     if (gSelGroup == r->gi && gSelZone == r->zone) refreshLayouts();
     graphOverlayRefresh();

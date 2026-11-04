@@ -18,8 +18,16 @@ struct Graph {
     std::vector<GraphText> texts;  // legend lines
     int runs = 0;  // outlines given
     int used = 0;  // outlines lined up and drawn
+    std::vector<int> usedRuns;  // which (indices into the outlines given)
+    std::vector<double> fits;  // per outline given: share of its walls on the drawn one's (-1 = not lined up)
 };
 
-Graph pointsGraph(const std::vector<Outline>& outlines);
+// minFit: an outline whose walls lie less than this on the drawn one's is another layout and is left out.
+Graph pointsGraph(const std::vector<Outline>& outlines, double minFit = 0.3);
+
+// A zone is made from a few base layouts that the game turns, mirrors and changes a little. Outlines of the same base
+// have about the same shape (the ground inside the outer walls), turned or mirrored or not: groups of them, largest
+// first (indices into outlines). minSame: how much two shapes must overlap (0..1) to be the same base.
+std::vector<std::vector<int>> layoutFamilies(const std::vector<Outline>& outlines, double minSame = 0.8);
 
 }  // namespace outline
